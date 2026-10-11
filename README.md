@@ -1,4 +1,4 @@
-# jenesboot-v2
+# jenesboat-v2
 
 This is a 2d submarine hunting simulation game. The background is set on WWII. The player controls the submarine searching and hunting enemy ships in the open ocean.
 The submarine must leverage it's stealth, limited speed and fire power to deal maxiumn damage to enemy naval power and economic.

@@ -27,7 +27,7 @@ fmt:
 
 # Run the package
 run *args:
-    uv run jenesboot-v2 {{args}}
+    uv run jenesboat-v2 {{args}}
 
 # Pull latest template changes
 template-update:

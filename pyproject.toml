@@ -1,5 +1,5 @@
 [project]
-name = "jenesboot-v2"
+name = "jenesboat-v2"
 version = "0.1.0"
 description = "A submarine game"
 readme = "README.md"
@@ -7,7 +7,7 @@ requires-python = ">=3.13"
 dependencies = []
 
 [project.scripts]
-jenesboot-v2 = "jenesboot_v2:main"
+jenesboot-v2 = "jenesboat_v2:main"
 
 [dependency-groups]
 dev = ["pytest", "ruff"]
