@@ -179,8 +179,6 @@ jobs:
           PR: ${{ github.event.pull_request.number }}
         run: |
           url="$PAGES_URL/builds/$NAME/"
-          body="Web build \`$NAME\` published: $url
-
-Agent check: \`just agent-web-test $url\`"
+          body="$(printf 'Web build `%s` published: %s\n\nAgent check: `just agent-web-test %s`' "$NAME" "$url" "$url")"
           gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "$body" --edit-last 2>/dev/null \
             || gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "$body"
