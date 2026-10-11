@@ -1,4 +1,4 @@
-FROM ghcr.io/pandazxx/codex-slack-agent-minimal:latest
+FROM ghcr.io/pandazxx/codex-slack-agent-minimal:v4.20-rc17
 
 USER root
 # Build toolchain + native libs needed by raylib (pyray) and headless testing
