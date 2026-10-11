@@ -1,0 +1,10 @@
+# Changes here will be overwritten by Copier; do not edit manually
+_commit: 88cd6ed
+_src_path: gh:pandazxx/project-templates
+create_github: true
+description: A submarine game
+github_visibility: public
+language: python
+package_name: jenesboot_v2
+project_name: jenesboot-v2
+python_version: '3.13'
