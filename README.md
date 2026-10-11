@@ -61,11 +61,11 @@ The major enemy ship types are merchant and military ships. They offen comes in 
 
 Use pyraylib, compile and deploy wasm on static webpages such as github pages / s3.
 
-Requires [Nix](https://nixos.org) (with flakes) and [direnv](https://direnv.net).
+Use ux to manage python env and packaging
 
-```bash
-direnv allow   # enters the devshell automatically
-just           # list available tasks
-```
+Use Nix-devshell for other tools and env
 
+Use justfile to manage shortcuts
+
+Use github action for CI/CD
 
