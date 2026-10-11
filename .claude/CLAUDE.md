@@ -16,7 +16,3 @@ propeller speed, weapons, and ship AI strategies). Art style: simple lines/boxes
 - Keep game logic (physics, ship AI, visibility) separate from rendering so it is unit-testable
   without a window.
 - `.copier-answers.yml` is managed by Copier; do not edit it.
-
-## Known issues
-- `pyproject.toml` script is named `jenesboot-v2` while the justfile runs `jenesboat-v2`; the
-  package name is `jenesboat_v2`. Align the names.
