@@ -59,13 +59,20 @@ The major enemy ship types are merchant and military ships. They offen comes in 
 
 ## Development
 
-Use pyraylib, compile and deploy wasm on static webpages such as github pages / s3.
+- Stack: Python 3.13 + [raylib-python-cffi](https://electronstudio.github.io/raylib-python-cffi/)
+  (`pyray`); the browser build is CPython 3.12 on WebAssembly via
+  [pygbag](https://pypi.org/project/pygbag/), deployed to GitHub Pages.
+- `uv` manages the Python environment and packaging; Nix devshell provides the other tools;
+  `just` holds the shortcuts (`just` lists them).
+- GitHub Actions lint, test, build and publish every build:
+  <https://pandazxx.github.io/jenesboat-v2/> (build index, one playable page per build).
+- Conventions (branches, commits, tags, releases, build naming): `docs/CONVENTIONS.md`.
+- How an LLM agent tests a build (headless sim, browser driver): `docs/AGENT_TESTING.md`.
 
-Use ux to manage python env and packaging
-
-Use Nix-devshell for other tools and env
-
-Use justfile to manage shortcuts
-
-Use github action for CI/CD
-
+```sh
+just sync        # install dependencies
+just test        # pytest (game logic is window-free)
+just run         # play in a native window
+just sim --trace # headless simulation, JSON events
+just build-web   # pygbag bundle in dist/web
+```

@@ -14,5 +14,11 @@ propeller speed, weapons, and ship AI strategies). Art style: simple lines/boxes
 - Run `just lint` and `just test` before every commit.
 - Work on a topic branch, push, and open a PR against `master`; never commit to `master`.
 - Keep game logic (physics, ship AI, visibility) separate from rendering so it is unit-testable
-  without a window.
+  without a window: `sim/` and `game.py` never import pyray; only `render.py`/`app.py` do.
+- The browser runtime (pygbag) is CPython 3.12: keep the package 3.12-compatible.
+- `just build-web <id>` builds `dist/web`; `just sim` runs the headless simulation;
+  `just agent-web-test <url>` drives a build in headless Chromium (see `docs/AGENT_TESTING.md`).
+- Conventions for branches, commits, tags, releases and web build naming: `docs/CONVENTIONS.md`.
+- CI (`.github/workflows/ci.yml`) publishes every build to the `gh-pages` branch under
+  `builds/<short-sha|tag>/` and regenerates the index with `scripts/gen_build_index.py`.
 - `.copier-answers.yml` is managed by Copier; do not edit it.

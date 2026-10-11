@@ -1,0 +1,186 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  PAGES_URL: https://pandazxx.github.io/jenesboat-v2
+
+jobs:
+  test:
+    name: Lint and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - uses: extractions/setup-just@v3
+      - run: just sync
+      - run: just lint
+      - run: just test
+
+  build-web:
+    name: Build web bundle
+    runs-on: ubuntu-latest
+    needs: test
+    outputs:
+      name: ${{ steps.meta.outputs.name }}
+      kind: ${{ steps.meta.outputs.kind }}
+      sha: ${{ steps.meta.outputs.sha }}
+      ref: ${{ steps.meta.outputs.ref }}
+      pr: ${{ steps.meta.outputs.pr }}
+      title: ${{ steps.meta.outputs.title }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync
+      - name: Name the build
+        id: meta
+        env:
+          PR_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_REF: ${{ github.event.pull_request.head.ref }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PUSH_TITLE: ${{ github.event.head_commit.message }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            kind=tag; sha="$GITHUB_SHA"; name="${GITHUB_REF_NAME//\//-}"; ref="$GITHUB_REF_NAME"
+            title="$(git log -1 --format=%s "$sha")"; pr=""
+          elif [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            kind=pr; sha="$PR_SHA"; name="${sha:0:7}"; ref="$PR_REF"; pr="$PR_NUMBER"; title="$PR_TITLE"
+          else
+            kind=commit; sha="$GITHUB_SHA"; name="${sha:0:7}"; ref="$GITHUB_REF_NAME"; pr=""
+            title="${PUSH_TITLE%%$'\n'*}"
+          fi
+          {
+            echo "name=$name"; echo "kind=$kind"; echo "sha=$sha"; echo "ref=$ref"; echo "pr=$pr"
+            echo "title<<EOF"; echo "$title"; echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          echo "build $name ($kind) from $sha"
+      - name: Build with pygbag
+        env:
+          META: >-
+            {"kind": "${{ steps.meta.outputs.kind }}", "ref": "${{ steps.meta.outputs.ref }}",
+             "pr": ${{ steps.meta.outputs.pr || 'null' }},
+             "title": ${{ toJSON(steps.meta.outputs.title) }},
+             "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+             "url": "${{ env.PAGES_URL }}/builds/${{ steps.meta.outputs.name }}/"}
+        run: |
+          uv run python scripts/build_web.py \
+            --build-id "${{ steps.meta.outputs.name }}" \
+            --sha "${{ steps.meta.outputs.sha }}" \
+            --out dist/web --meta-json "$META"
+          cat dist/web/build.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-${{ steps.meta.outputs.name }}
+          path: dist/web
+          if-no-files-found: error
+
+  web-smoke:
+    name: Agent smoke test (browser)
+    runs-on: ubuntu-latest
+    needs: build-web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-${{ needs.build-web.outputs.name }}
+          path: dist/web
+      - run: uv run playwright install --with-deps chromium
+      - name: Serve and drive the build
+        run: |
+          (uv run python -m http.server 8000 --directory dist/web >/tmp/http.log 2>&1 &)
+          sleep 1
+          uv run python scripts/agent_web_test.py http://localhost:8000/ \
+            --keys "W:3,D:2" --screenshot dist/agent/web.png --out dist/agent/web.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: agent-smoke-${{ needs.build-web.outputs.name }}
+          path: dist/agent
+          if-no-files-found: ignore
+
+  deploy:
+    name: Publish to GitHub Pages
+    runs-on: ubuntu-latest
+    needs: build-web
+    # Same-repo PRs, pushes to master and tags all get published; forks cannot write.
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: write
+      pull-requests: write
+    concurrency:
+      group: gh-pages
+      cancel-in-progress: false
+    env:
+      NAME: ${{ needs.build-web.outputs.name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: repo
+      - uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: site
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-${{ env.NAME }}
+          path: incoming
+      - name: Add build and regenerate index
+        run: |
+          set -euo pipefail
+          rm -rf "site/builds/$NAME"
+          mkdir -p site/builds
+          mv incoming "site/builds/$NAME"
+          python3 repo/scripts/gen_build_index.py site --repo "$GITHUB_REPOSITORY"
+      - name: Commit and push
+        run: |
+          set -euo pipefail
+          cd site
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Publish build $NAME (${{ needs.build-web.outputs.kind }} ${{ needs.build-web.outputs.sha }})" || { echo "nothing to publish"; exit 0; }
+          for i in 1 2 3 4 5; do
+            git push origin gh-pages && exit 0
+            echo "push rejected, rebasing (attempt $i)"
+            git fetch origin gh-pages
+            git reset --soft origin/gh-pages
+            python3 ../repo/scripts/gen_build_index.py . --repo "$GITHUB_REPOSITORY"
+            git add -A
+            git commit -m "Publish build $NAME (${{ needs.build-web.outputs.kind }} ${{ needs.build-web.outputs.sha }})"
+          done
+          exit 1
+      - name: Summary
+        run: |
+          url="$PAGES_URL/builds/$NAME/"
+          echo "### Build published" >> "$GITHUB_STEP_SUMMARY"
+          echo "- play: $url" >> "$GITHUB_STEP_SUMMARY"
+          echo "- index: $PAGES_URL/" >> "$GITHUB_STEP_SUMMARY"
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          url="$PAGES_URL/builds/$NAME/"
+          body="Web build \`$NAME\` published: $url
+
+Agent check: \`just agent-web-test $url\`"
+          gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "$body" --edit-last 2>/dev/null \
+            || gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "$body"

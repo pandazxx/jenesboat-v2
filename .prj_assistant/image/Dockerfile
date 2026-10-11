@@ -16,6 +16,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xvfb \
     && rm -rf /var/lib/apt/lists/*
 
+# Shared libraries for Playwright's headless Chromium (scripts/agent_web_test.py), so agents
+# can drive web builds in the browser. The browser itself comes from `just agent-setup`.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libglib2.0-0 libnss3 libnspr4 libdbus-1-3 libatk1.0-0 libatk-bridge2.0-0 libcups2 \
+    libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libgbm1 libpango-1.0-0 \
+    libcairo2 libexpat1 \
+    && (apt-get install -y --no-install-recommends libasound2 \
+        || apt-get install -y --no-install-recommends libasound2t64) \
+    && rm -rf /var/lib/apt/lists/*
+
 # uv (Python/dependency manager) and just (task runner), installed system-wide.
 # uv downloads the Python version pinned in .python-version on demand.
 RUN curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin INSTALLER_NO_MODIFY_PATH=1 sh \
