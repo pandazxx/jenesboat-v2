@@ -2,7 +2,7 @@
 """Drive a web build in headless Chromium the way an LLM agent would.
 
     uv run python scripts/agent_web_test.py https://pandazxx.github.io/jenesboat-v2/builds/abc1234/
-    uv run python scripts/agent_web_test.py http://localhost:8000/ --keys W:3,D:2 --screenshot s.png
+    uv run python scripts/agent_web_test.py http://127.0.0.1:9000/ --keys W:3,D:2 --screenshot s.png
 
 Loads the page, waits for the game's ``JENESBOAT {"event":"ready"}`` console line, presses
 keys, collects ``state`` events, takes a screenshot and prints a JSON summary.  Exit code is
@@ -52,6 +52,12 @@ def main() -> int:
     p.add_argument("--out", default="dist/agent/web.json", help="where to write the summary")
     p.add_argument("--headed", action="store_true")
     args = p.parse_args()
+    if args.url.startswith("http://localhost:8"):
+        print(
+            "warning: pygbag treats http://localhost:8xxx as its dev server and will look for "
+            "wheels at http://localhost:8000/cdn/; serve on 127.0.0.1 or another port instead",
+            file=sys.stderr,
+        )
 
     from playwright.sync_api import sync_playwright
 

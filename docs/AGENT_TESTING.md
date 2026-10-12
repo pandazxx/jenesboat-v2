@@ -60,9 +60,13 @@ judge rendering (ocean grid, grey merchant boxes, orange escort, yellow submarin
 To test a local build instead of a deployed one:
 
 ```sh
-just build-web mybuild && just serve-web &   # http://localhost:8000
-just agent-web-test http://localhost:8000/
+just build-web mybuild && just serve-web &   # http://127.0.0.1:9000
+just agent-web-test http://127.0.0.1:9000/
 ```
+
+Do not serve a build on `http://localhost:8xxx`: the pygbag runtime treats that origin as its
+own dev server and rewrites the package CDN to `http://localhost:8000/cdn/`, so the `cffi` and
+`raylib` wheels 404 and the game never reaches `ready`.
 
 CI runs exactly this against every build (**Agent smoke test** job) and uploads the screenshot
 and summary as the `agent-smoke-<name>` artifact.

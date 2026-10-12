@@ -104,9 +104,11 @@ jobs:
       - run: uv run playwright install --with-deps chromium
       - name: Serve and drive the build
         run: |
-          (uv run python -m http.server 8000 --directory dist/web >/tmp/http.log 2>&1 &)
+          # Not localhost:8xxx: the pygbag runtime treats that as its dev server and
+          # rewrites the package CDN to http://localhost:8000/cdn/ (wheels then 404).
+          (uv run python -m http.server 9000 --bind 127.0.0.1 --directory dist/web >/tmp/http.log 2>&1 &)
           sleep 1
-          uv run python scripts/agent_web_test.py http://localhost:8000/ \
+          uv run python scripts/agent_web_test.py http://127.0.0.1:9000/ \
             --keys "W:3,D:2" --screenshot dist/agent/web.png --out dist/agent/web.json
       - uses: actions/upload-artifact@v4
         if: always()

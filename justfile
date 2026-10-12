@@ -40,9 +40,9 @@ sim *args:
 build-web build_id="dev" *args:
     uv run python scripts/build_web.py --build-id "$1" "${@:2}"
 
-# Serve dist/web on http://localhost:8000
-serve-web port="8000":
-    uv run python -m http.server {{port}} --directory dist/web
+# Serve dist/web on http://127.0.0.1:9000 (not localhost:8xxx: pygbag treats that as its dev server)
+serve-web port="9000":
+    uv run python -m http.server {{port}} --bind 127.0.0.1 --directory dist/web
 
 # One-time: download the headless browser used by agent-web-test
 agent-setup:
