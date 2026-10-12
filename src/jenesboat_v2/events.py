@@ -8,6 +8,7 @@ console, so the same lines can be collected with Playwright.
 from __future__ import annotations
 
 import json
+import platform
 import sys
 from collections.abc import Callable
 from typing import Any
@@ -17,8 +18,29 @@ PREFIX = "JENESBOAT "
 Sink = Callable[[str], None]
 
 
+_js_console: Any = None
+_js_console_resolved = False
+
+
+def _browser_console() -> Any:
+    """In pygbag, stdout goes to the in-page terminal; mirror events to the JS console so a
+    Playwright driver (or a human with devtools) can collect them.  ``None`` elsewhere."""
+    global _js_console, _js_console_resolved
+    if not _js_console_resolved:
+        _js_console_resolved = True
+        if platform.system() == "Emscripten":
+            try:
+                _js_console = platform.window.console  # type: ignore[attr-defined]
+            except AttributeError:
+                _js_console = None
+    return _js_console
+
+
 def _stdout_sink(line: str) -> None:
     print(line, flush=True, file=sys.stdout)
+    console = _browser_console()
+    if console is not None:
+        console.log(line)
 
 
 _sink: Sink = _stdout_sink
