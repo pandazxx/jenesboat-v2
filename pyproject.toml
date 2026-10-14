@@ -4,13 +4,13 @@ version = "0.1.0"
 description = "A submarine game"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = ["raylib>=5.5"]
 
 [project.scripts]
-jenesboat-v2 = "jenesboat_v2:main"
+jenesboat-v2 = "jenesboat_v2:entrypoint"
 
 [dependency-groups]
-dev = ["pytest", "ruff"]
+dev = ["pytest", "ruff", "pygbag>=0.9.3", "playwright>=1.45"]
 
 [build-system]
 requires = ["hatchling"]

@@ -1,0 +1,41 @@
+name: Bug report
+description: Something is wrong in a build
+labels: ["type:bug"]
+body:
+  - type: input
+    id: build
+    attributes:
+      label: Build id
+      description: Bottom-right of the HUD, or the `builds/<id>/` part of the URL.
+      placeholder: 64f220d or v0.1.0
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      value: |
+        1. 
+        2. 
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual
+      description: Attach a screenshot or the agent smoke summary if you have one.
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options: ["p1", "p0", "p2"]
+    validations:
+      required: true

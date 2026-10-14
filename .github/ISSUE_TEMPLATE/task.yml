@@ -1,0 +1,14 @@
+name: Task
+description: Chore, refactor or tooling work with no player-visible change
+labels: ["type:task"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What and why
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when

@@ -1,0 +1,37 @@
+name: Requirement
+description: A feature, rule, balance or control change to be built by the agent
+labels: ["type:requirement"]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: The player experience or outcome, one paragraph.
+    validations:
+      required: true
+  - type: textarea
+    id: criteria
+    attributes:
+      label: Acceptance criteria
+      description: Checklist the user can verify by playing a build or reading a screen.
+      value: |
+        - [ ] 
+        - [ ] 
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Out of scope / notes
+  - type: textarea
+    id: refs
+    attributes:
+      label: References
+      description: README sections, issues, images, links.
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options: ["p1", "p0", "p2"]
+    validations:
+      required: true

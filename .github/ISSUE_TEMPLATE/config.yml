@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Build index
+    url: https://pandazxx.github.io/jenesboat-v2/
+    about: Play any CI build; the build id is in the HUD and in the URL.
+  - name: Agent workflow convention
+    url: https://github.com/pandazxx/jenesboat-v2/blob/master/docs/AGENT_WORKFLOW.md
+    about: How requirements, issues, test results and reviews flow between user and agent.
