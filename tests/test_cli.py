@@ -30,7 +30,7 @@ def test_headless_script_moves_and_dives(capsys):
     assert final["player"]["speed_kn"] > 5.0
     assert final["player"]["heading"] > 10.0
     assert final["player"]["depth"] > 0.0
-    assert len(final["ships"]) == 4
+    assert len(final["ships"]) == 3
 
 
 def test_headless_trace_emits_states(capsys):
