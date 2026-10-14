@@ -98,6 +98,7 @@ class World:
     time: float = 0.0
     light: float = 1.0  # 1 = day; night scales the visual ranges
     tonnage: int = 0  # GRT sunk so far
+    mission_over: bool = False
     contacts: list[Contact] = field(default_factory=list)
     events: list[dict] = field(default_factory=list)  # pending, drained by the game loop
     _known: dict[str, str] = field(default_factory=dict)  # ship id -> contact method
@@ -114,6 +115,32 @@ class World:
 
     def ship(self, ship_id: str) -> Ship:
         return next(s for s in self.ships if s.ship_id == ship_id)
+
+    @property
+    def torpedoes_left(self) -> int:
+        tubes = self.player.tubes
+        return tubes.loaded + tubes.reserves + len(self.torpedoes)
+
+    def mission(self) -> dict:
+        """The hunt: over when every merchant is sunk or escaped, or the torpedoes are gone."""
+        merchants = self.merchants
+        sunk = [s.ship_id for s in merchants if s.sunk]
+        escaped = [s.ship_id for s in merchants if s.escaped]
+        remaining = [s.ship_id for s in merchants if s.active]
+        if not remaining:
+            status = "complete"
+        elif self.torpedoes_left == 0:
+            status = "out_of_torpedoes"
+        else:
+            status = "active"
+        return {
+            "status": status,
+            "sunk": sunk,
+            "escaped": escaped,
+            "remaining": remaining,
+            "tonnage": self.tonnage,
+            "torpedoes_left": self.torpedoes_left,
+        }
 
     def emit(self, event: str, **data) -> None:
         self.events.append({"event": event, "t": round(self.time, 2), **data})
@@ -148,6 +175,11 @@ class World:
             if ship.active:
                 self._check_escaped(ship)
         self._run_torpedoes(dt)
+        if not self.mission_over:
+            mission = self.mission()
+            if mission["status"] != "active":
+                self.mission_over = True
+                self.emit("mission_end", **mission)
 
     def _keep_in_bounds(self, vessel: Vessel) -> None:
         vessel.x = clamp(vessel.x, 0.0, self.width)
@@ -255,6 +287,7 @@ class World:
             "contacts": [c.snapshot() for c in self.contacts],
             "torpedoes": [t.snapshot() for t in self.torpedoes],
             "tonnage": self.tonnage,
+            "mission": self.mission(),
         }
 
 

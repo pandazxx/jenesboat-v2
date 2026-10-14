@@ -15,6 +15,8 @@ propeller speed, weapons, and ship AI strategies). Art style: simple lines/boxes
 - Work on a topic branch, push, and open a PR against `master`; never commit to `master`.
 - Keep game logic (physics, ship AI, visibility) separate from rendering so it is unit-testable
   without a window: `sim/` and `game.py` never import pyray; only `render.py`/`app.py` do.
+- Every tunable number lives in `sim/params.py` and is explained in `docs/PARAMETERS.md`;
+  balance changes edit those, not the modules that use them.
 - The browser runtime (pygbag) is CPython 3.12: keep the package 3.12-compatible.
 - `just build-web <id>` builds `dist/web`; `just sim` runs the headless simulation;
   `just agent-web-test <url>` drives a build in headless Chromium (see `docs/AGENT_TESTING.md`).

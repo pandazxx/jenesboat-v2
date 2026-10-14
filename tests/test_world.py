@@ -166,6 +166,15 @@ def test_contacts_visual_then_hydrophone_then_none():
 
 def test_snapshot_shape():
     snap = default_world().snapshot()
-    assert set(snap) == {"t", "world", "player", "ships", "contacts", "torpedoes", "tonnage"}
+    assert set(snap) == {
+        "t",
+        "world",
+        "player",
+        "ships",
+        "contacts",
+        "torpedoes",
+        "tonnage",
+        "mission",
+    }
     assert {s["id"] for s in snap["ships"]} == {"merchant-1", "merchant-2", "merchant-3"}
     assert {s["type"] for s in snap["ships"]} == {"freighter"}

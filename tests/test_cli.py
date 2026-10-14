@@ -19,18 +19,33 @@ def test_headless_script_moves_and_dives(capsys):
     script = json.dumps(
         [{"t": 0, "throttle": 1.0}, {"t": 5, "rudder": 1.0}, {"t": 8, "dive": True}]
     )
-    assert main(["--headless", "--seconds", "30", "--script", script]) == 0
+    assert main(["--headless", "--seconds", "30", "--seed", "7", "--script", script]) == 0
     evs = events_from(capsys.readouterr().out)
     kinds = [e["event"] for e in evs]
     assert kinds[0] == "ready"
+    assert kinds[1] == "intel"
     assert kinds.count("order") == 3
     assert kinds[-1] == "final"
     final = evs[-1]
     assert final["t"] == 30.0
+    assert final["seed"] == 7
     assert final["player"]["speed_kn"] > 5.0
-    assert final["player"]["heading"] > 10.0
+    assert final["player"]["rudder"] == 1.0
     assert final["player"]["depth"] > 0.0
     assert len(final["ships"]) == 3
+
+
+def test_headless_fire_deep_and_time_scale_orders(capsys):
+    script = json.dumps([{"t": 0, "fire": True}, {"t": 1, "deep": True}, {"t": 2, "time_scale": 4}])
+    assert main(["--headless", "--seconds", "10", "--seed", "1", "--script", script]) == 0
+    evs = events_from(capsys.readouterr().out)
+    kinds = [e["event"] for e in evs]
+    assert "fire" in kinds
+    final = evs[-1]
+    assert final["time_scale"] == 4
+    assert final["t"] > 30.0  # 2 s at x1 then 8 s at x4
+    assert final["player"]["target_depth"] == 60.0
+    assert final["player"]["tubes"]["loaded"] == 3
 
 
 def test_headless_trace_emits_states(capsys):

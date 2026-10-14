@@ -19,8 +19,19 @@ The major enemy ship types are merchant and military ships. They offen comes in 
 ## Controls
 
 - All vessels (including both player and enemy ships) use classic ship maneuver, accelerate / decelerate by propeller, turn by rudder.
-- Different types of vessels have different maneuver parameters
+- Different types of vessels have different maneuver parameters (`docs/PARAMETERS.md`).
 - Player uses WASD to control submarine's propeller and rudder. Another key to controll submerging / emerging.
+
+| key   | action                                                   |
+| ----- | -------------------------------------------------------- |
+| W / S | throttle up / down (held)                                |
+| A / D | rudder port / starboard (held)                           |
+| Space | surfaced -> periscope depth -> surfaced; deep -> periscope depth |
+| C     | go deep (60 m)                                           |
+| F     | fire a torpedo along the heading                         |
+| - / = | zoom out / in                                            |
+| 1-4   | time compression x1 / x2 / x4 / x8                       |
+| R     | new hunt (new seed)                                      |
 
 
 ## Weapons
@@ -74,7 +85,11 @@ The major enemy ship types are merchant and military ships. They offen comes in 
 ```sh
 just sync        # install dependencies
 just test        # pytest (game logic is window-free)
-just run         # play in a native window
+just run         # play in a native window (--seed N for a given hunt)
 just sim --trace # headless simulation, JSON events
 just build-web   # pygbag bundle in dist/web
 ```
+
+Milestones: M0 bootstrap (#2), M1 merchant hunting (#9): spot a merchant group far away,
+predict its route, ambush it submerged and torpedo it before it sees you and runs. Every number
+the balance depends on is in `docs/PARAMETERS.md`.

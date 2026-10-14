@@ -26,22 +26,27 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--seconds", type=float, default=10.0, help="headless: game time to simulate")
     p.add_argument("--dt", type=float, default=0.1, help="headless: simulation step in seconds")
     p.add_argument("--trace", action="store_true", help="headless: emit a state event every second")
+    p.add_argument("--seed", type=int, default=None, help="scenario seed (random if omitted)")
     p.add_argument(
         "--script",
         default=None,
         help=(
             "headless: JSON list of timed orders, e.g. "
             '\'[{"t":0,"throttle":1},{"t":5,"rudder":1},{"t":8,"dive":true}]\'. '
-            "Keys: throttle, rudder (-1..1), dive (toggle), target_depth (m)."
+            "Keys: throttle, rudder (-1..1), dive (toggle), deep, target_depth (m), fire, "
+            "time_scale (1, 2, 4 or 8)."
         ),
     )
     return p
 
 
-def run_headless(seconds: float, dt: float, script: str | None, trace: bool) -> dict:
+def run_headless(
+    seconds: float, dt: float, script: str | None, trace: bool, seed: int | None = None
+) -> dict:
+    """Simulate ``seconds`` of game time (time compression applies on top of that)."""
     orders = sorted(json.loads(script) if script else [], key=lambda o: o.get("t", 0.0))
-    game = Game(state_interval=1.0 if trace else math.inf)
     events.emit("ready", build=BUILD_ID, sha=GIT_SHA, platform="headless", seconds=seconds)
+    game = Game(state_interval=1.0 if trace else math.inf, seed=seed)
     sub = game.world.player
     t = 0.0
     while t < seconds - 1e-9:
@@ -55,6 +60,12 @@ def run_headless(seconds: float, dt: float, script: str | None, trace: bool) -> 
                 sub.set_target_depth(float(order["target_depth"]))
             if order.get("dive"):
                 sub.toggle_dive()
+            if order.get("deep"):
+                sub.order_deep()
+            if "time_scale" in order:
+                game.set_time_scale(int(order["time_scale"]))
+            if order.get("fire"):
+                game.fire()
             events.emit("order", **order)
         game.update(dt)
         t += dt
@@ -69,11 +80,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"jenesboat-v2 {VERSION} (build {BUILD_ID})")
         return 0
     if args.headless:
-        run_headless(args.seconds, args.dt, args.script, args.trace)
+        run_headless(args.seconds, args.dt, args.script, args.trace, args.seed)
         return 0
     from jenesboat_v2.app import main as app_main
 
-    app_main()
+    app_main(seed=args.seed)
     return 0
 
 
