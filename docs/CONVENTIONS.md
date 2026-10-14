@@ -1,11 +1,14 @@
 # Development conventions
 
+How the user and the coding agent collaborate (requirements, issues, test results, reviews)
+is in `docs/AGENT_WORKFLOW.md`; this file covers the git and release mechanics.
+
 ## Branches and pull requests
 
 - `master` is always releasable. Nobody commits to it directly; every change arrives through a
   pull request.
-- Work on topic branches named `topic/<short-slug>` (agents append a short id, e.g.
-  `topic/m0-3672910`). Delete the branch after merge.
+- Work on topic branches named `topic/<issue#>-<short-slug>` (e.g. `topic/7-demo`; milestone
+  bootstrap branches may use `topic/m0-<id>`). Delete the branch after merge.
 - Open the PR against `master` early. The PR title is the squash/merge commit subject.
 - Required checks before merge: **Lint and test**, **Build web bundle**. The browser smoke test
   (**Agent smoke test**) must pass unless the PR explains why it cannot.

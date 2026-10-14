@@ -68,6 +68,8 @@ The major enemy ship types are merchant and military ships. They offen comes in 
   <https://pandazxx.github.io/jenesboat-v2/> (build index, one playable page per build).
 - Conventions (branches, commits, tags, releases, build naming): `docs/CONVENTIONS.md`.
 - How an LLM agent tests a build (headless sim, browser driver): `docs/AGENT_TESTING.md`.
+- How user and agent collaborate (requirements, issues, acceptance tests, reviews):
+  `docs/AGENT_WORKFLOW.md`.
 
 ```sh
 just sync        # install dependencies

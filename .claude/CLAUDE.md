@@ -19,6 +19,8 @@ propeller speed, weapons, and ship AI strategies). Art style: simple lines/boxes
 - `just build-web <id>` builds `dist/web`; `just sim` runs the headless simulation;
   `just agent-web-test <url>` drives a build in headless Chromium (see `docs/AGENT_TESTING.md`).
 - Conventions for branches, commits, tags, releases and web build naming: `docs/CONVENTIONS.md`.
+- Collaboration rules (file issues for chat requirements, labels, acceptance cases in
+  `tests/acceptance/`, test plan checklist in the PR, how to reply to reviews): `docs/AGENT_WORKFLOW.md`.
 - CI (`.github/workflows/ci.yml`) publishes every build to the `gh-pages` branch under
   `builds/<short-sha|tag>/` and regenerates the index with `scripts/gen_build_index.py`.
 - `.copier-answers.yml` is managed by Copier; do not edit it.
