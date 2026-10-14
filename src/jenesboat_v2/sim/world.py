@@ -5,15 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from jenesboat_v2.sim import ai
+from jenesboat_v2.sim.params import DESTROYER, FREIGHTER
 from jenesboat_v2.sim.submarine import Submarine, new_submarine
-from jenesboat_v2.sim.vessel import KNOT, Vessel, VesselParams
+from jenesboat_v2.sim.vessel import KNOT, Vessel
 
-MERCHANT_PARAMS = VesselParams(
-    max_speed=11.0 * KNOT, acceleration=0.1, turn_rate=2.5, length=120.0, beam=16.0
-)
-DESTROYER_PARAMS = VesselParams(
-    max_speed=32.0 * KNOT, acceleration=0.5, turn_rate=6.0, length=100.0, beam=10.0
-)
+MERCHANT_PARAMS = FREIGHTER.vessel
+DESTROYER_PARAMS = DESTROYER.vessel
 
 
 @dataclass

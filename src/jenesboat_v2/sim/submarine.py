@@ -4,19 +4,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from jenesboat_v2.sim.vessel import KNOT, Vessel, VesselParams, clamp
+from jenesboat_v2.sim.params import TYPE_VIIC_SURFACED
+from jenesboat_v2.sim.vessel import Vessel, clamp
 
 PERISCOPE_DEPTH = 12.0  # metres
 SURFACED_DEPTH = 0.5  # shallower than this counts as surfaced
 
-TYPE_VII_PARAMS = VesselParams(
-    max_speed=17.0 * KNOT,
-    acceleration=0.25,
-    turn_rate=5.0,
-    reverse_fraction=0.4,
-    length=67.0,
-    beam=6.2,
-)
+TYPE_VII_PARAMS = TYPE_VIIC_SURFACED
 
 
 @dataclass

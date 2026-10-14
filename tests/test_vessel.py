@@ -3,7 +3,8 @@ import math
 from jenesboat_v2.sim import KNOT, Vessel, VesselParams
 from jenesboat_v2.sim.vessel import angle_diff, wrap_degrees
 
-PARAMS = VesselParams(max_speed=10.0, acceleration=1.0, turn_rate=10.0)
+# 10 m/s on a 57.3 m radius turns 10 deg/s (rate = v / r radians).
+PARAMS = VesselParams(max_speed=10.0, acceleration=1.0, turn_radius=57.2958, max_turn_rate=10.0)
 
 
 def run(vessel: Vessel, seconds: float, dt: float = 0.1) -> None:
@@ -44,11 +45,31 @@ def test_starboard_rudder_turns_clockwise_once_moving():
     assert v.x > 0.0
 
 
+def test_turn_rate_grows_with_speed_and_is_capped():
+    slow = Vessel(params=PARAMS, speed=5.0, rudder=1.0)
+    fast = Vessel(params=PARAMS, speed=10.0, rudder=1.0)
+    assert math.isclose(slow.turn_rate_now(), 5.0, rel_tol=1e-3)
+    assert math.isclose(fast.turn_rate_now(), 10.0, rel_tol=1e-3)
+    racing = Vessel(params=PARAMS, speed=50.0, rudder=1.0)
+    assert racing.turn_rate_now() == PARAMS.max_turn_rate
+    astern = Vessel(params=PARAMS, speed=-5.0, rudder=1.0)
+    assert astern.turn_rate_now() < 0.0
+
+
 def test_no_turn_without_way():
     v = Vessel(params=PARAMS)
     v.set_rudder(1.0)
     run(v, 1)
     assert v.heading == 0.0
+
+
+def test_hull_box_contains_points_along_heading():
+    v = Vessel(params=VesselParams(max_speed=1.0, length=100.0, beam=10.0), heading=90.0)
+    assert v.contains(40.0, 0.0)  # 40 m ahead along east
+    assert v.contains(0.0, 4.0)  # 4 m across
+    assert not v.contains(60.0, 0.0)
+    assert not v.contains(0.0, 8.0)
+    assert v.contains(0.0, 8.0, margin=5.0)
 
 
 def test_heading_wraps_and_angle_diff_is_shortest():
