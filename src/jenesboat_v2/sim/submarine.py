@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
+from jenesboat_v2.sim.geo import project
 from jenesboat_v2.sim.params import HOUR, TYPE_VIIC, SubmarineParams
 from jenesboat_v2.sim.vessel import Vessel, clamp
+from jenesboat_v2.sim.weapons import Torpedo, Tubes
 
 SURFACED_DEPTH = 0.5  # shallower than this counts as surfaced
 PERISCOPE_DEPTH = TYPE_VIIC.periscope_depth
@@ -17,6 +19,8 @@ class Submarine(Vessel):
     depth: float = 0.0
     target_depth: float = 0.0
     battery: float = 1.0  # 0 (flat) .. 1 (full)
+    tubes: Tubes = field(default_factory=Tubes)
+    fired: int = 0
 
     # --- depth -----------------------------------------------------------------------------
 
@@ -86,6 +90,21 @@ class Submarine(Vessel):
         full = 1.0 / (self.spec.battery_full_speed_hours * HOUR)
         return -(creep + (full - creep) * load)
 
+    # --- weapons ---------------------------------------------------------------------------
+
+    @property
+    def can_fire(self) -> bool:
+        return self.tubes.can_fire and self.depth <= self.spec.fire_max_depth
+
+    def fire(self) -> Torpedo | None:
+        """Launch one torpedo from the bow along the current heading, or ``None`` if the tubes
+        are empty or the boat is too deep."""
+        if not self.can_fire or not self.tubes.fire():
+            return None
+        self.fired += 1
+        bx, by = project(self.x, self.y, self.heading, self.params.length / 2)
+        return Torpedo(self.fired, bx, by, self.heading, self.tubes.params)
+
     # --- stepping --------------------------------------------------------------------------
 
     def step(self, dt: float) -> None:
@@ -97,6 +116,7 @@ class Submarine(Vessel):
         else:
             self.depth -= delta
         self.battery = clamp(self.battery + self.battery_rate() * dt, 0.0, 1.0)
+        self.tubes.step(dt)
         super().step(dt)
 
     def snapshot(self) -> dict[str, float]:
@@ -106,6 +126,8 @@ class Submarine(Vessel):
         data["surfaced"] = self.surfaced
         data["band"] = self.depth_band
         data["battery"] = round(self.battery, 3)
+        data["tubes"] = self.tubes.snapshot()
+        data["can_fire"] = self.can_fire
         return data
 
 

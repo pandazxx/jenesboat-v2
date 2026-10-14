@@ -7,10 +7,14 @@ from dataclasses import dataclass, field
 
 from jenesboat_v2.sim import ai, detection
 from jenesboat_v2.sim.detection import Contact
-from jenesboat_v2.sim.geo import clamp, distance
+from jenesboat_v2.sim.geo import clamp, distance, project
 from jenesboat_v2.sim.params import DETECTION, FREIGHTER, KNOT, MERCHANT_AI, ShipType
 from jenesboat_v2.sim.submarine import Submarine, new_submarine
 from jenesboat_v2.sim.vessel import Vessel
+from jenesboat_v2.sim.weapons import Torpedo
+
+HIT_MARGIN = 2.0  # m, forgiveness on the hull box for the torpedo point
+THREAT_BEHIND_TORPEDO = 2_000.0  # m, where a hit merchant assumes the boat is
 
 
 @dataclass
@@ -90,8 +94,10 @@ class World:
     height: float
     player: Submarine
     ships: list[Ship] = field(default_factory=list)
+    torpedoes: list[Torpedo] = field(default_factory=list)
     time: float = 0.0
     light: float = 1.0  # 1 = day; night scales the visual ranges
+    tonnage: int = 0  # GRT sunk so far
     contacts: list[Contact] = field(default_factory=list)
     events: list[dict] = field(default_factory=list)  # pending, drained by the game loop
     _known: dict[str, str] = field(default_factory=dict)  # ship id -> contact method
@@ -112,6 +118,17 @@ class World:
     def emit(self, event: str, **data) -> None:
         self.events.append({"event": event, "t": round(self.time, 2), **data})
 
+    # --- orders ----------------------------------------------------------------------------
+
+    def fire(self) -> Torpedo | None:
+        torpedo = self.player.fire()
+        if torpedo is None:
+            self.emit("fire_refused", reason="deep" if self.player.tubes.can_fire else "empty")
+            return None
+        self.torpedoes.append(torpedo)
+        self.emit("fire", torpedo=torpedo.torpedo_id, heading=round(torpedo.heading, 1))
+        return torpedo
+
     # --- stepping --------------------------------------------------------------------------
 
     def step(self, dt: float) -> None:
@@ -130,6 +147,7 @@ class World:
             ship.step(dt)
             if ship.active:
                 self._check_escaped(ship)
+        self._run_torpedoes(dt)
 
     def _keep_in_bounds(self, vessel: Vessel) -> None:
         vessel.x = clamp(vessel.x, 0.0, self.width)
@@ -200,6 +218,32 @@ class World:
             ship.escaped = True
             self.emit("escaped", ship=ship.ship_id)
 
+    def _run_torpedoes(self, dt: float) -> None:
+        for torpedo in self.torpedoes:
+            torpedo.step(dt)
+            if not torpedo.alive:
+                self.emit("torpedo_lost", torpedo=torpedo.torpedo_id)
+                continue
+            if not torpedo.armed:
+                continue
+            for ship in self.active_ships:
+                if ship.contains(torpedo.x, torpedo.y, HIT_MARGIN):
+                    self._hit(torpedo, ship)
+                    break
+        self.torpedoes = [t for t in self.torpedoes if t.alive]
+
+    def _hit(self, torpedo: Torpedo, ship: Ship) -> None:
+        torpedo.alive = False
+        ship.hits += 1
+        self.emit("hit", torpedo=torpedo.torpedo_id, ship=ship.ship_id, hits=ship.hits)
+        if ship.hits >= ship.type.hits_to_sink:
+            ship.sunk = True
+            self.tonnage += ship.type.tonnage
+            self.emit("sunk", ship=ship.ship_id, tonnage=ship.type.tonnage, total=self.tonnage)
+        # The others only know which way the torpedo came from.
+        tx, ty = project(torpedo.x, torpedo.y, torpedo.heading + 180.0, THREAT_BEHIND_TORPEDO)
+        self.alert_group(tx, ty, "torpedo", by=ship.ship_id, radius=MERCHANT_AI.panic_range)
+
     # --- output ----------------------------------------------------------------------------
 
     def snapshot(self) -> dict:
@@ -209,6 +253,8 @@ class World:
             "player": self.player.snapshot(),
             "ships": [ship.snapshot() for ship in self.ships],
             "contacts": [c.snapshot() for c in self.contacts],
+            "torpedoes": [t.snapshot() for t in self.torpedoes],
+            "tonnage": self.tonnage,
         }
 
 
