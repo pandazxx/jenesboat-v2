@@ -43,13 +43,16 @@ A `state`/`final` payload looks like:
  "target":"freighter-1","solution":{"run":1800.0,"time":117.0,"error":-12.0},
  "tonnage":0,"mission":{"status":"active","sunk":[],"escaped":[],"remaining":[...],
                         "tonnage":0,"torpedoes_left":11},
+ "cue":{"kind":"intel","ship":null,"x":...,"y":...,"course":212.0,"bearing":38.0,"range":15600.0},
  "world":{"width":40000.0,"height":40000.0,"light":1.0}}
 ```
 
 `contacts` is what the boat knows (visual contacts carry position, course and speed;
 hydrophone contacts only a bearing); `ships` is ground truth for checking. `solution` is the
 fire-control helper for the nearest visual contact: `error` near 0 means a torpedo fired now
-along the heading meets the target. `tests/test_hunt.py` shows a scripted skipper that uses
+along the heading meets the target. `cue` is where to look when nothing is in sight: the intel
+report, or the dead-reckoned position of the ship seen last (`kind` = `last_seen`); `null`
+while a ship is in sight. `tests/test_hunt.py` shows a scripted skipper that uses
 exactly these to ambush the group; it is the template for an agent playing a build.
 
 ## 3. The web build in a headless browser

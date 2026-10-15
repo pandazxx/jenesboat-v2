@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import random
 
-from jenesboat_v2.sim.geo import bearing, distance, project, wrap_degrees
+from jenesboat_v2.sim.geo import bearing, project, wrap_degrees
 from jenesboat_v2.sim.params import FREIGHTER, TANKER
 from jenesboat_v2.sim.submarine import new_submarine
 from jenesboat_v2.sim.world import World, new_ship
@@ -44,13 +44,6 @@ def hunting_scenario(seed: int | None = None) -> World:
     world = World(width=WORLD_SIZE, height=WORLD_SIZE, player=player, ships=ships)
     rx = cx + rng.uniform(-INTEL_POSITION_ERROR, INTEL_POSITION_ERROR)
     ry = cy + rng.uniform(-INTEL_POSITION_ERROR, INTEL_POSITION_ERROR)
-    world.emit(
-        "intel",
-        ships=len(ships),
-        bearing=round(bearing(player.x, player.y, rx, ry)),
-        range=round(distance(player.x, player.y, rx, ry), -2),
-        course=round(wrap_degrees(course + rng.uniform(-INTEL_COURSE_ERROR, INTEL_COURSE_ERROR))),
-        x=round(rx),
-        y=round(ry),
-    )
+    reported_course = wrap_degrees(course + rng.uniform(-INTEL_COURSE_ERROR, INTEL_COURSE_ERROR))
+    world.report_intel(rx, ry, reported_course, len(ships))
     return world

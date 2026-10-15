@@ -175,6 +175,40 @@ def test_snapshot_shape():
         "torpedoes",
         "tonnage",
         "mission",
+        "cue",
     }
     assert {s["id"] for s in snap["ships"]} == {"merchant-1", "merchant-2", "merchant-3"}
     assert {s["type"] for s in snap["ships"]} == {"freighter"}
+
+
+def test_cue_points_at_intel_then_last_seen_then_nothing():
+    world = one_merchant(sub_x=10_000.0)  # in sight from the start (10 km < 12 km)
+    world.report_intel(C + 3000.0, C + 4000.0, 90.0, 1)
+    assert world.events[-1]["event"] == "intel"
+    assert world.cue()["kind"] == "intel"  # nothing in sight before the first step
+    world.step(0.1)
+    assert world.cue() is None  # a visual contact: the map speaks for itself
+    world.player.depth = world.player.target_depth = TYPE_VIIC.deep_depth
+    world.step(0.1)
+    cue = world.cue()
+    assert cue["kind"] == "last_seen" and cue["ship"] == "merchant-1"
+    assert cue["course"] == 90.0 and cue["bearing"] == 270.0
+    # Dead reckoned along the ship's course.
+    run(world, 100.0)
+    later = world.cue()
+    assert later["x"] > cue["x"] and later["y"] == cue["y"]
+    assert abs(later["x"] - world.ship("merchant-1").x) < 50.0
+    world.ship("merchant-1").sunk = True
+    assert world.cue()["kind"] == "intel"  # the last-seen ship is out of play
+    world.intel = None
+    assert world.cue() is None
+
+
+def test_boat_leaves_a_track():
+    world = default_world()
+    world.player.set_throttle(1.0)
+    run(world, 120)
+    track = world.player_track
+    assert len(track) > 5
+    assert all(distance(*a, *b) >= 49.0 for a, b in zip(track, track[1:], strict=False))
+    assert distance(*track[-1], world.player.x, world.player.y) < 60.0

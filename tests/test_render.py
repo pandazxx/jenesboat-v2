@@ -79,3 +79,32 @@ def test_every_zoom_level_draws():
     for _ in range(6):
         game.apply(Controls(zoom_out=True), 0.1)
         draw(game)
+
+
+def test_draws_the_intel_cue_on_and_off_screen_and_the_last_seen_cue():
+    game = Game(seed=1, state_interval=float("inf"))
+    off = draw(game)  # the 14 km intel marker is off-screen at 20 m/px: an edge arrow
+    assert "draw_text" in off
+    intel = game.world.intel
+    game.world.player.x, game.world.player.y = intel["x"] + 500.0, intel["y"]
+    on = draw(game)
+    assert "draw_text" in on and "draw_line_ex" in on  # dashed circle, course tick, label
+    contact = Game(world=default_world(), state_interval=float("inf"))
+    contact.update(0.1)
+    contact.world.player.depth = contact.world.player.target_depth = TYPE_VIIC.deep_depth
+    contact.update(0.1)
+    assert contact.world.cue()["kind"] == "last_seen"
+    draw(contact)
+
+
+def test_close_zoom_draws_the_minor_grid_and_the_own_track():
+    game = Game(world=default_world(), state_interval=float("inf"))
+    game.world.player.set_throttle(1.0)
+    for _ in range(600):
+        game.update(0.1)
+    far = draw(game)
+    for _ in range(3):
+        game.apply(Controls(zoom_in=True), 0.1)
+    near = draw(game)
+    assert near.count("draw_line") >= 15  # 200 m grid lines across a 1.9 x 1.1 km view
+    assert "draw_pixel" in near and "draw_pixel" in far  # the boat's own track

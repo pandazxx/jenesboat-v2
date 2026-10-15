@@ -13,9 +13,14 @@ from jenesboat_v2._build_info import BUILD_ID
 from jenesboat_v2.game import Game
 from jenesboat_v2.sim.detection import HYDROPHONE, VISUAL, ship_detection_range
 from jenesboat_v2.sim.geo import angle_on_bow, bearing, project
+from jenesboat_v2.sim.scenario import INTEL_POSITION_ERROR
 
 OCEAN = (12, 32, 60, 255)
-GRID = (20, 48, 84, 255)
+GRID = (26, 60, 102, 255)
+GRID_MINOR = (18, 44, 78, 255)
+GRID_LABEL = (80, 112, 156, 255)
+OWN_TRACK = (90, 110, 140, 255)
+CUE = (230, 190, 110, 255)
 EDGE = (60, 90, 130, 255)
 HULL_MERCHANT = (200, 200, 200, 255)
 HULL_MILITARY = (240, 120, 90, 255)
@@ -35,6 +40,10 @@ HUD_DIM = (150, 160, 170, 255)
 ALERT = (255, 120, 90, 255)
 
 TRACK_LENGTH = 12_000.0  # m of projected track drawn ahead of the target
+HUD_TOP = 84  # px reserved for the HUD text at the top
+PANEL_BOTTOM = 150  # px, below the contact panel on the right
+EDGE_MARGIN = 28  # px, where off-screen cue arrows sit
+MINOR_GRID_MAX_ZOOM = 5.0  # m/px; closer than this a 200 m grid is drawn too
 
 
 def _color(rl, rgba):
@@ -62,6 +71,8 @@ def draw(rl, game: Game, width: int, height: int) -> None:
     rl.begin_drawing()
     rl.clear_background(_color(rl, OCEAN))
     _draw_grid(rl, cam, world.width, world.height)
+    _draw_own_track(rl, cam, world.player_track, sub.x, sub.y)
+    _draw_cue(rl, cam, world.cue())
 
     for ship in world.ships:
         if ship.sunk:
@@ -88,25 +99,98 @@ def draw(rl, game: Game, width: int, height: int) -> None:
 
 
 def _draw_grid(rl, cam: Camera, world_w: float, world_h: float) -> None:
-    step = 1000.0
+    """World-fixed grid: 1 km lines labelled with their km coordinate (so the map is seen
+    to scroll under the boat even at slow speeds), plus 200 m lines when zoomed in."""
+    if cam.zoom <= MINOR_GRID_MAX_ZOOM:
+        _grid_lines(rl, cam, 200.0, GRID_MINOR, label=False)
+    _grid_lines(rl, cam, 1000.0, GRID, label=True)
+    # The edge of the map.
+    ax, ay = cam.to_screen(0.0, world_h)
+    bx, by = cam.to_screen(world_w, 0.0)
+    rl.draw_rectangle_lines(int(ax), int(ay), int(bx - ax), int(by - ay), _color(rl, EDGE))
+
+
+def _grid_lines(rl, cam: Camera, step: float, rgba, label: bool) -> None:
     x0 = math.floor((cam.cx - cam.width / 2 * cam.zoom) / step) * step
     x1 = cam.cx + cam.width / 2 * cam.zoom
     gx = x0
     while gx <= x1:
         sx, _ = cam.to_screen(gx, 0.0)
-        rl.draw_line(int(sx), 0, int(sx), cam.height, _color(rl, GRID))
+        rl.draw_line(int(sx), 0, int(sx), cam.height, _color(rl, rgba))
+        if label:
+            km = f"{gx / 1000:.0f}"
+            rl.draw_text(km, int(sx) + 3, HUD_TOP, 12, _color(rl, GRID_LABEL))
         gx += step
     y0 = math.floor((cam.cy - cam.height / 2 * cam.zoom) / step) * step
     y1 = cam.cy + cam.height / 2 * cam.zoom
     gy = y0
     while gy <= y1:
         _, sy = cam.to_screen(0.0, gy)
-        rl.draw_line(0, int(sy), cam.width, int(sy), _color(rl, GRID))
+        rl.draw_line(0, int(sy), cam.width, int(sy), _color(rl, rgba))
+        if label and PANEL_BOTTOM < sy < cam.height - 70:
+            km = f"{gy / 1000:.0f}"
+            tw = rl.measure_text(km, 12)
+            rl.draw_text(km, cam.width - tw - 3, int(sy) - 14, 12, _color(rl, GRID_LABEL))
         gy += step
-    # The edge of the map.
-    ax, ay = cam.to_screen(0.0, world_h)
-    bx, by = cam.to_screen(world_w, 0.0)
-    rl.draw_rectangle_lines(int(ax), int(ay), int(bx - ax), int(by - ay), _color(rl, EDGE))
+
+
+def _draw_own_track(rl, cam: Camera, track: list[tuple[float, float]], x: float, y: float) -> None:
+    """Dots where the boat has been: the clearest sign it is moving."""
+    for px, py in track[-400:]:
+        sx, sy = cam.to_screen(px, py)
+        if 0 <= sx <= cam.width and 0 <= sy <= cam.height:
+            rl.draw_pixel(int(sx), int(sy), _color(rl, OWN_TRACK))
+    if track:
+        ax, ay = cam.to_screen(*track[-1])
+        bx, by = cam.to_screen(x, y)
+        rl.draw_line_ex(rl.Vector2(ax, ay), rl.Vector2(bx, by), 1.0, _color(rl, OWN_TRACK))
+
+
+def _draw_cue(rl, cam: Camera, cue: dict | None) -> None:
+    """The intel report (or the last-seen position): a dashed circle with a course tick on the
+    map, and an arrow at the screen edge pointing at it when it is off-screen."""
+    if cue is None:
+        return
+    label = "INTEL" if cue["kind"] == "intel" else f"LAST SEEN {cue['ship']}"
+    text = f"{label}  {cue['bearing']:03.0f}  {cue['range'] / 1000:.1f} km"
+    radius_m = INTEL_POSITION_ERROR if cue["kind"] == "intel" else 1_000.0
+    sx, sy = cam.to_screen(cue["x"], cue["y"])
+    _draw_dashed_circle(rl, sx, sy, max(8.0, cam.px(radius_m)), CUE)
+    tx, ty = project(cue["x"], cue["y"], cue["course"], radius_m * 1.5)
+    stx, sty = cam.to_screen(tx, ty)
+    rl.draw_line_ex(rl.Vector2(sx, sy), rl.Vector2(stx, sty), 1.0, _color(rl, CUE))
+    on_screen = 0 <= sx <= cam.width and HUD_TOP <= sy <= cam.height - 70
+    if on_screen:
+        rl.draw_text(text, int(sx) + 8, int(sy) + 8, 14, _color(rl, CUE))
+        return
+    # Off-screen: an arrow on the edge of the map area, pointing the way.
+    dx, dy = sx - cam.width / 2, sy - cam.height / 2
+    norm = math.hypot(dx, dy) or 1.0
+    ux, uy = dx / norm, dy / norm
+    half_w = cam.width / 2 - EDGE_MARGIN
+    half_h = (cam.height - HUD_TOP - 70) / 2 - EDGE_MARGIN
+    mid_y = HUD_TOP + (cam.height - HUD_TOP - 70) / 2
+    k = min(half_w / abs(ux) if ux else math.inf, half_h / abs(uy) if uy else math.inf)
+    ex, ey = cam.width / 2 + ux * k, mid_y + uy * k
+    tip = rl.Vector2(ex + ux * 12, ey + uy * 12)
+    left = rl.Vector2(ex - uy * 7, ey + ux * 7)
+    right = rl.Vector2(ex + uy * 7, ey - ux * 7)
+    rl.draw_line_ex(left, tip, 2.0, _color(rl, CUE))
+    rl.draw_line_ex(right, tip, 2.0, _color(rl, CUE))
+    rl.draw_line_ex(left, right, 2.0, _color(rl, CUE))
+    tw = rl.measure_text(text, 14)
+    lx = min(max(int(ex) - tw // 2, 4), cam.width - tw - 4)
+    ly = int(ey) + (14 if uy < 0 else -30)
+    rl.draw_text(text, lx, ly, 14, _color(rl, CUE))
+
+
+def _draw_dashed_circle(rl, sx: float, sy: float, radius: float, rgba, dashes: int = 24) -> None:
+    for i in range(0, dashes, 2):
+        a0 = 2 * math.pi * i / dashes
+        a1 = 2 * math.pi * (i + 1) / dashes
+        p0 = rl.Vector2(sx + math.cos(a0) * radius, sy + math.sin(a0) * radius)
+        p1 = rl.Vector2(sx + math.cos(a1) * radius, sy + math.sin(a1) * radius)
+        rl.draw_line_ex(p0, p1, 1.0, _color(rl, rgba))
 
 
 def _draw_hull(rl, cam: Camera, x, y, heading, speed, params, rgba) -> None:
@@ -202,7 +286,8 @@ def _draw_hud(rl, game: Game, width: int, height: int) -> None:
     tubes = sub.tubes
     line1 = (
         f"HDG {sub.heading:05.1f}   SPD {sub.speed_knots:5.1f} kn   "
-        f"THR {sub.throttle:+.2f}   RUD {sub.rudder:+.1f}"
+        f"THR {sub.throttle:+.2f}   RUD {sub.rudder:+.1f}   "
+        f"POS {sub.x / 1000:.1f}E {sub.y / 1000:.1f}N"
     )
     line2 = (
         f"DEPTH {sub.depth:5.1f} m -> {sub.target_depth:5.1f} m   {sub.depth_band.upper()}"
@@ -286,6 +371,13 @@ def _draw_contact_panel(rl, game: Game, width: int) -> None:
                 lines.append((f"  {c.ship_id} bearing {c.bearing:03.0f}", HYDRO))
         else:
             lines.append(("no contact", HUD_DIM))
+        cue = world.cue()
+        if cue is not None:
+            what = "intel" if cue["kind"] == "intel" else f"last seen {cue['ship']}"
+            lines.append(
+                (f"{what}: bearing {cue['bearing']:03.0f}, {cue['range'] / 1000:.1f} km", CUE)
+            )
+            lines.append((f"  course ~{cue['course']:03.0f}", CUE))
     y = 10
     for text, color in lines:
         tw = rl.measure_text(text, 18)

@@ -7,13 +7,15 @@ from dataclasses import dataclass, field
 
 from jenesboat_v2.sim import ai, detection
 from jenesboat_v2.sim.detection import Contact
-from jenesboat_v2.sim.geo import clamp, distance, project
+from jenesboat_v2.sim.geo import bearing, clamp, distance, project
 from jenesboat_v2.sim.params import DETECTION, FREIGHTER, KNOT, MERCHANT_AI, ShipType
 from jenesboat_v2.sim.submarine import Submarine, new_submarine
 from jenesboat_v2.sim.vessel import Vessel
 from jenesboat_v2.sim.weapons import Torpedo
 
 HIT_MARGIN = 2.0  # m, forgiveness on the hull box for the torpedo point
+TRACK_SPACING = 50.0  # m between points of the boat's own track
+TRACK_POINTS = 600  # kept (30 km of track)
 THREAT_BEHIND_TORPEDO = 2_000.0  # m, where a hit merchant assumes the boat is
 
 
@@ -99,7 +101,10 @@ class World:
     light: float = 1.0  # 1 = day; night scales the visual ranges
     tonnage: int = 0  # GRT sunk so far
     mission_over: bool = False
+    intel: dict | None = None  # the radio report: x, y, course, ships (rough)
     contacts: list[Contact] = field(default_factory=list)
+    last_seen: dict[str, dict] = field(default_factory=dict)  # ship id -> last visual fix
+    player_track: list[tuple[float, float]] = field(default_factory=list)
     events: list[dict] = field(default_factory=list)  # pending, drained by the game loop
     _known: dict[str, str] = field(default_factory=dict)  # ship id -> contact method
 
@@ -145,6 +150,51 @@ class World:
     def emit(self, event: str, **data) -> None:
         self.events.append({"event": event, "t": round(self.time, 2), **data})
 
+    def report_intel(self, x: float, y: float, course: float, ships: int) -> None:
+        """The radio report at the start of a hunt: a rough position and course."""
+        sub = self.player
+        self.intel = {"x": x, "y": y, "course": course, "ships": ships, "t": self.time}
+        self.emit(
+            "intel",
+            ships=ships,
+            bearing=round(bearing(sub.x, sub.y, x, y)),
+            range=round(distance(sub.x, sub.y, x, y), -2),
+            course=round(course),
+            x=round(x),
+            y=round(y),
+        )
+
+    def cue(self) -> dict | None:
+        """Where to look when nothing is in sight: the dead-reckoned position of the ship seen
+        last (if still in play), else the intel report.  ``None`` once a ship is in sight or
+        there is nothing to go on."""
+        sub = self.player
+        if any(c.method == "visual" for c in self.contacts):
+            return None
+        fixes = [
+            (fix, ship_id) for ship_id, fix in self.last_seen.items() if self.ship(ship_id).active
+        ]
+        if fixes:
+            fix, ship_id = max(fixes, key=lambda f: f[0]["t"])
+            x, y = project(
+                fix["x"], fix["y"], fix["heading"], fix["speed"] * (self.time - fix["t"])
+            )
+            kind, course, ship = "last_seen", fix["heading"], ship_id
+        elif self.intel is not None:
+            x, y = self.intel["x"], self.intel["y"]
+            kind, course, ship = "intel", self.intel["course"], None
+        else:
+            return None
+        return {
+            "kind": kind,
+            "ship": ship,
+            "x": round(x, 1),
+            "y": round(y, 1),
+            "course": round(course, 1),
+            "bearing": round(bearing(sub.x, sub.y, x, y), 1),
+            "range": round(distance(sub.x, sub.y, x, y), 0),
+        }
+
     # --- orders ----------------------------------------------------------------------------
 
     def fire(self) -> Torpedo | None:
@@ -162,6 +212,7 @@ class World:
         self.time += dt
         self.player.step(dt)
         self._keep_in_bounds(self.player)
+        self._record_track()
         self._sense()
         self._lookouts(dt)
         for ship in self.ships:
@@ -181,6 +232,14 @@ class World:
                 self.mission_over = True
                 self.emit("mission_end", **mission)
 
+    def _record_track(self) -> None:
+        sub = self.player
+        if not self.player_track or (
+            distance(sub.x, sub.y, *self.player_track[-1]) >= TRACK_SPACING
+        ):
+            self.player_track.append((sub.x, sub.y))
+            del self.player_track[:-TRACK_POINTS]
+
     def _keep_in_bounds(self, vessel: Vessel) -> None:
         vessel.x = clamp(vessel.x, 0.0, self.width)
         vessel.y = clamp(vessel.y, 0.0, self.height)
@@ -192,6 +251,14 @@ class World:
             contact = detection.observe(self.player, ship, self.light)
             if contact is not None:
                 contacts.append(contact)
+                if contact.method == detection.VISUAL:
+                    self.last_seen[ship.ship_id] = {
+                        "x": ship.x,
+                        "y": ship.y,
+                        "heading": ship.heading,
+                        "speed": ship.speed,
+                        "t": self.time,
+                    }
         self.contacts = contacts
         known = {c.ship_id: c.method for c in contacts}
         for ship_id, method in known.items():
@@ -288,6 +355,7 @@ class World:
             "torpedoes": [t.snapshot() for t in self.torpedoes],
             "tonnage": self.tonnage,
             "mission": self.mission(),
+            "cue": self.cue(),
         }
 
 
