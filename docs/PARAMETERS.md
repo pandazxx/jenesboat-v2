@@ -6,6 +6,14 @@ clockwise from north. The HUD converts to knots and kilometres. `tests/test_para
 the relations that the game balance depends on (e.g. "a submerged boat cannot catch a
 fleeing merchant").
 
+## Orders (`TELEGRAPH`, `RUDDER_MAX_ANGLE`, `RUDDER_RATE`)
+
+The engine telegraph has seven positions: ASTERN FULL (-1.0), ASTERN HALF (-0.5), STOP, AHEAD
+SLOW (0.25), AHEAD HALF (0.5), AHEAD FULL (0.75), AHEAD FLANK (1.0), as fractions of the
+vessel's current speed limit (so AHEAD HALF is 8.9 kn surfaced and 3.8 kn submerged, just
+under the hydrophone limit). The rudder moves at `RUDDER_RATE` = 0.5 per second while A/D is
+held (hard over, 35°, in 2 s) and stays where it is released.
+
 ## Vessel motion (`VesselParams`)
 
 All vessels use the same classic model: the propeller order sets a target speed that the ship

@@ -82,3 +82,18 @@ def test_heading_wraps_and_angle_diff_is_shortest():
 def test_speed_in_knots():
     v = Vessel(params=PARAMS, speed=KNOT * 8)
     assert math.isclose(v.speed_knots, 8.0)
+
+
+def test_telegraph_positions_and_names():
+    from jenesboat_v2.sim.vessel import telegraph_by_name, telegraph_index
+
+    v = Vessel(params=PARAMS)
+    assert v.telegraph_label == "STOP"
+    v.set_telegraph(telegraph_by_name("ahead half"))
+    assert v.throttle == 0.5 and v.telegraph_label == "AHEAD HALF"
+    v.set_throttle(0.6)  # a scripted throttle still reads as the nearest position
+    assert v.telegraph_label == "AHEAD HALF" and telegraph_index(0.9) == 6
+    v.telegraph_step(-10)
+    assert v.telegraph_label == "ASTERN FULL"
+    assert telegraph_by_name("warp 9") is None
+    assert v.snapshot()["telegraph"] == "ASTERN FULL"

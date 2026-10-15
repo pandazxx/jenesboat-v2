@@ -14,9 +14,9 @@ from dataclasses import dataclass
 from jenesboat_v2 import events
 from jenesboat_v2.sim import World, hunting_scenario
 from jenesboat_v2.sim.detection import VISUAL, Contact
+from jenesboat_v2.sim.params import RUDDER_RATE
 from jenesboat_v2.sim.weapons import Solution, solution
 
-THROTTLE_RAMP = 0.5  # throttle units per second while W/S is held
 TIME_SCALES = (1, 2, 4, 8)
 ZOOM_LEVELS = (2.0, 5.0, 10.0, 20.0, 40.0)  # metres per pixel
 DEFAULT_ZOOM = 3  # index: 20 m/px, about 19 km across a 960 px window
@@ -26,12 +26,14 @@ MESSAGE_LIMIT = 6
 
 @dataclass
 class Controls:
-    """What the player is doing this frame.  Held keys are levels, the rest are edges."""
+    """What the player is doing this frame.  ``port``/``starboard`` are held keys (the rudder
+    keeps moving while held and stays where it is let go); everything else is an edge."""
 
-    throttle_up: bool = False
-    throttle_down: bool = False
+    throttle_up: bool = False  # one telegraph position ahead
+    throttle_down: bool = False  # one telegraph position astern
     port: bool = False
     starboard: bool = False
+    rudder_center: bool = False  # rudder amidships
     dive_toggle: bool = False
     deep: bool = False
     fire: bool = False
@@ -67,15 +69,15 @@ class Game:
             return
         sub = self.world.player
         if controls.throttle_up:
-            sub.set_throttle(sub.throttle + THROTTLE_RAMP * dt)
+            sub.telegraph_step(+1)
         if controls.throttle_down:
-            sub.set_throttle(sub.throttle - THROTTLE_RAMP * dt)
-        rudder = 0.0
+            sub.telegraph_step(-1)
         if controls.port:
-            rudder -= 1.0
+            sub.set_rudder(sub.rudder - RUDDER_RATE * dt)
         if controls.starboard:
-            rudder += 1.0
-        sub.set_rudder(rudder)
+            sub.set_rudder(sub.rudder + RUDDER_RATE * dt)
+        if controls.rudder_center:
+            sub.set_rudder(0.0)
         if controls.dive_toggle:
             sub.toggle_dive()
         if controls.deep:
@@ -143,16 +145,18 @@ class Game:
     # --- what the HUD shows ----------------------------------------------------------------
 
     def target(self) -> Contact | None:
-        """The visual contact nearest the boat (the one the fire-control helper tracks)."""
+        """The nearest visual contact (the one the fire-control helper tracks), or failing
+        that the nearest hydrophone contact (shown as an estimate, no solution)."""
         visual = [c for c in self.world.contacts if c.method == VISUAL]
-        if not visual:
+        pool = visual or self.world.contacts
+        if not pool:
             return None
-        return min(visual, key=lambda c: c.range or math.inf)
+        return min(pool, key=lambda c: c.range or math.inf)
 
     def solution(self) -> Solution | None:
         target = self.target()
         sub = self.world.player
-        if target is None or target.x is None:
+        if target is None or target.x is None or target.method != VISUAL:
             return None
         return solution(
             sub.x,

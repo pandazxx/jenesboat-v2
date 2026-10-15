@@ -6,9 +6,19 @@ import math
 from dataclasses import dataclass
 
 from jenesboat_v2.sim.geo import angle_diff, clamp, wrap_degrees
-from jenesboat_v2.sim.params import KNOT, VesselParams
+from jenesboat_v2.sim.params import KNOT, RUDDER_MAX_ANGLE, TELEGRAPH, VesselParams
 
 __all__ = ["KNOT", "Vessel", "VesselParams", "angle_diff", "clamp", "wrap_degrees"]
+
+
+def telegraph_index(throttle: float) -> int:
+    """The telegraph position nearest to a throttle fraction."""
+    return min(range(len(TELEGRAPH)), key=lambda i: abs(TELEGRAPH[i][1] - throttle))
+
+
+def telegraph_by_name(name: str) -> int | None:
+    name = name.strip().upper()
+    return next((i for i, (label, _) in enumerate(TELEGRAPH) if label == name), None)
 
 
 @dataclass
@@ -28,6 +38,36 @@ class Vessel:
 
     def set_rudder(self, value: float) -> None:
         self.rudder = clamp(value, -1.0, 1.0)
+
+    # --- the bridge view of the orders ---------------------------------------------------
+
+    @property
+    def telegraph(self) -> int:
+        return telegraph_index(self.throttle)
+
+    @property
+    def telegraph_label(self) -> str:
+        return TELEGRAPH[self.telegraph][0]
+
+    def set_telegraph(self, index: int) -> None:
+        index = max(0, min(len(TELEGRAPH) - 1, index))
+        self.set_throttle(TELEGRAPH[index][1])
+
+    def telegraph_step(self, delta: int) -> None:
+        """One telegraph position ahead (+1) or astern (-1)."""
+        self.set_telegraph(self.telegraph + delta)
+
+    @property
+    def rudder_angle(self) -> float:
+        """Degrees, positive to starboard."""
+        return self.rudder * RUDDER_MAX_ANGLE
+
+    @property
+    def rudder_label(self) -> str:
+        angle = self.rudder_angle
+        if abs(angle) < 0.5:
+            return "RUDDER AMIDSHIPS"
+        return f"RUDDER {abs(angle):2.0f} {'STBD' if angle > 0 else 'PORT'}"
 
     def max_speed_now(self) -> float:
         """Current speed ceiling; subclasses may reduce it (e.g. when submerged)."""
@@ -83,5 +123,6 @@ class Vessel:
             "heading": round(self.heading, 1),
             "speed_kn": round(self.speed_knots, 2),
             "throttle": round(self.throttle, 2),
+            "telegraph": self.telegraph_label,
             "rudder": round(self.rudder, 2),
         }

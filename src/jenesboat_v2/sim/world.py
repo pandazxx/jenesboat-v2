@@ -105,6 +105,8 @@ class World:
     contacts: list[Contact] = field(default_factory=list)
     last_seen: dict[str, dict] = field(default_factory=dict)  # ship id -> last visual fix
     player_track: list[tuple[float, float]] = field(default_factory=list)
+    player_log: float = 0.0  # m travelled by the boat (the ship's log)
+    _last_pos: tuple[float, float] | None = None
     events: list[dict] = field(default_factory=list)  # pending, drained by the game loop
     _known: dict[str, str] = field(default_factory=dict)  # ship id -> contact method
 
@@ -165,11 +167,11 @@ class World:
         )
 
     def cue(self) -> dict | None:
-        """Where to look when nothing is in sight: the dead-reckoned position of the ship seen
-        last (if still in play), else the intel report.  ``None`` once a ship is in sight or
-        there is nothing to go on."""
+        """Where to look when there is no contact at all: the dead-reckoned position of the
+        ship fixed last (if still in play), else the intel report.  ``None`` while any ship is
+        held visually or on the hydrophones, or when there is nothing to go on."""
         sub = self.player
-        if any(c.method == "visual" for c in self.contacts):
+        if self.contacts:
             return None
         fixes = [
             (fix, ship_id) for ship_id, fix in self.last_seen.items() if self.ship(ship_id).active
@@ -234,6 +236,9 @@ class World:
 
     def _record_track(self) -> None:
         sub = self.player
+        if self._last_pos is not None:
+            self.player_log += distance(*self._last_pos, sub.x, sub.y)
+        self._last_pos = (sub.x, sub.y)
         if not self.player_track or (
             distance(sub.x, sub.y, *self.player_track[-1]) >= TRACK_SPACING
         ):
@@ -251,7 +256,7 @@ class World:
             contact = detection.observe(self.player, ship, self.light)
             if contact is not None:
                 contacts.append(contact)
-                if contact.method == detection.VISUAL:
+                if contact.x is not None:  # a fix: visual, or the sonar's estimate
                     self.last_seen[ship.ship_id] = {
                         "x": ship.x,
                         "y": ship.y,
@@ -356,6 +361,7 @@ class World:
             "tonnage": self.tonnage,
             "mission": self.mission(),
             "cue": self.cue(),
+            "log_nm": round(self.player_log / 1852.0, 3),
         }
 
 

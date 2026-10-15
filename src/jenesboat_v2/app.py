@@ -21,10 +21,11 @@ def read_controls(rl) -> Controls:
         if rl.is_key_pressed(k):
             scale = value
     return Controls(
-        throttle_up=rl.is_key_down(key.KEY_W),
-        throttle_down=rl.is_key_down(key.KEY_S),
+        throttle_up=rl.is_key_pressed(key.KEY_W),
+        throttle_down=rl.is_key_pressed(key.KEY_S),
         port=rl.is_key_down(key.KEY_A),
         starboard=rl.is_key_down(key.KEY_D),
+        rudder_center=rl.is_key_pressed(key.KEY_Q),
         dive_toggle=rl.is_key_pressed(key.KEY_SPACE),
         deep=rl.is_key_pressed(key.KEY_C),
         fire=rl.is_key_pressed(key.KEY_F),
@@ -53,6 +54,9 @@ async def run(max_seconds: float | None = None, seed: int | None = None) -> None
         dt = min(rl.get_frame_time(), 0.1)
         controls = read_controls(rl)
         for name, pressed in (
+            ("W", controls.throttle_up),
+            ("S", controls.throttle_down),
+            ("Q", controls.rudder_center),
             ("SPACE", controls.dive_toggle),
             ("C", controls.deep),
             ("F", controls.fire),

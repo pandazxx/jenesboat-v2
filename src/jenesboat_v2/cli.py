@@ -11,6 +11,7 @@ from collections.abc import Sequence
 from jenesboat_v2 import events
 from jenesboat_v2._build_info import BUILD_ID, GIT_SHA
 from jenesboat_v2.game import Game
+from jenesboat_v2.sim.vessel import telegraph_by_name
 
 VERSION = "0.1.0"
 
@@ -33,8 +34,8 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "headless: JSON list of timed orders, e.g. "
             '\'[{"t":0,"throttle":1},{"t":5,"rudder":1},{"t":8,"dive":true}]\'. '
-            "Keys: throttle, rudder (-1..1), dive (toggle), deep, target_depth (m), fire, "
-            "time_scale (1, 2, 4 or 8)."
+            "Keys: throttle (-1..1) or telegraph ('ahead half', ...), rudder (-1..1), "
+            "dive (toggle), deep, target_depth (m), fire, time_scale (1, 2, 4 or 8)."
         ),
     )
     return p
@@ -54,6 +55,11 @@ def run_headless(
             order = orders.pop(0)
             if "throttle" in order:
                 sub.set_throttle(float(order["throttle"]))
+            if "telegraph" in order:
+                index = telegraph_by_name(str(order["telegraph"]))
+                if index is None:
+                    raise SystemExit(f"unknown telegraph order {order['telegraph']!r}")
+                sub.set_telegraph(index)
             if "rudder" in order:
                 sub.set_rudder(float(order["rudder"]))
             if "target_depth" in order:

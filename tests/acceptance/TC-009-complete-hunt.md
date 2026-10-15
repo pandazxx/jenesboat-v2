@@ -13,7 +13,8 @@ Fresh hunt (`R`), x8 time (`4`), zoomed out (`-` twice).
 1. Read the BdU report, run surfaced toward the reported position until the group is sighted.
 2. Read `CRS` and the dashed projected route; run surfaced to a point 1-2 km beside the route,
    ahead of the group, before the ships come within about 7 km (`RNG`).
-3. Stop (`S` to `THR 0.00`), `Space` to periscope depth, point the bow across the route.
+3. Stop (`S` to `STOP`), `Space` to periscope depth, point the bow across the route (`A`/`D`,
+   then `Q`).
 4. Press `1` (x1) when the nearest ship is within 3 km; wait for `FIRE` on the panel and press
    `F`. Fire at the others as solutions appear.
 5. Play on until the banner appears.

@@ -1,5 +1,7 @@
 import math
 
+import pytest
+
 from jenesboat_v2.sim import KNOT, World, default_world, new_ship
 from jenesboat_v2.sim.geo import angle_diff, bearing, distance
 from jenesboat_v2.sim.params import DETECTION, FREIGHTER, MERCHANT_AI, TYPE_VIIC
@@ -153,7 +155,9 @@ def test_contacts_visual_then_hydrophone_then_none():
     world.player.depth = world.player.target_depth = TYPE_VIIC.deep_depth
     world.step(0.1)
     assert [c.method for c in world.contacts] == ["hydrophone"]
-    assert set(world.snapshot()["contacts"][0]) == {"id", "method", "bearing"}
+    sonar = world.snapshot()["contacts"][0]
+    assert sonar["method"] == "hydrophone" and sonar["type"] == ""  # an estimate, unidentified
+    assert sonar["range"] == 10_000.0 and sonar["heading"] == 90.0 and sonar["speed_kn"] == 8.0
     assert drain(world, "contact")[-1]["method"] == "hydrophone"
 
     world.player.speed = 6.0 * KNOT  # own noise masks the hydrophones
@@ -176,6 +180,7 @@ def test_snapshot_shape():
         "tonnage",
         "mission",
         "cue",
+        "log_nm",
     }
     assert {s["id"] for s in snap["ships"]} == {"merchant-1", "merchant-2", "merchant-3"}
     assert {s["type"] for s in snap["ships"]} == {"freighter"}
@@ -190,10 +195,14 @@ def test_cue_points_at_intel_then_last_seen_then_nothing():
     assert world.cue() is None  # a visual contact: the map speaks for itself
     world.player.depth = world.player.target_depth = TYPE_VIIC.deep_depth
     world.step(0.1)
+    assert world.cue() is None  # still held on the hydrophones
+    world.player.speed = 6.0 * KNOT  # own noise: contact lost altogether
+    world.step(0.1)
     cue = world.cue()
     assert cue["kind"] == "last_seen" and cue["ship"] == "merchant-1"
     assert cue["course"] == 90.0 and cue["bearing"] == 270.0
     # Dead reckoned along the ship's course.
+    world.player.throttle = 1.0  # stays fast and deep: no contact
     run(world, 100.0)
     later = world.cue()
     assert later["x"] > cue["x"] and later["y"] == cue["y"]
@@ -210,5 +219,7 @@ def test_boat_leaves_a_track():
     run(world, 120)
     track = world.player_track
     assert len(track) > 5
+    assert world.player_log > 250.0  # the ship's log counts every metre
+    assert world.snapshot()["log_nm"] == pytest.approx(world.player_log / 1852.0, abs=1e-3)
     assert all(distance(*a, *b) >= 49.0 for a, b in zip(track, track[1:], strict=False))
     assert distance(*track[-1], world.player.x, world.player.y) < 60.0

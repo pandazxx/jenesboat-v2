@@ -12,6 +12,20 @@ from dataclasses import dataclass
 KNOT = 0.514444  # metres per second
 HOUR = 3600.0
 
+# Engine telegraph: the propeller orders the player steps through, as throttle fractions.
+TELEGRAPH: tuple[tuple[str, float], ...] = (
+    ("ASTERN FULL", -1.0),
+    ("ASTERN HALF", -0.5),
+    ("STOP", 0.0),
+    ("AHEAD SLOW", 0.25),
+    ("AHEAD HALF", 0.5),
+    ("AHEAD FULL", 0.75),
+    ("AHEAD FLANK", 1.0),
+)
+TELEGRAPH_STOP = 2  # index of STOP
+RUDDER_MAX_ANGLE = 35.0  # degrees at full rudder (display only; the sim uses -1..1)
+RUDDER_RATE = 0.5  # rudder units per second while A/D is held (hard over in 2 s)
+
 
 @dataclass(frozen=True)
 class VesselParams:

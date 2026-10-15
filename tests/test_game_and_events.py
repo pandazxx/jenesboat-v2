@@ -6,6 +6,7 @@ from jenesboat_v2 import events
 from jenesboat_v2.game import TIME_SCALES, ZOOM_LEVELS, Controls, Game, describe
 from jenesboat_v2.sim import default_world
 from jenesboat_v2.sim.geo import angle_diff
+from jenesboat_v2.sim.params import TELEGRAPH, TELEGRAPH_STOP
 
 
 @pytest.fixture
@@ -33,17 +34,39 @@ def test_game_emits_state_at_interval(captured):
     assert states[-1]["player"]["speed_kn"] == 0.0
 
 
-def test_controls_ramp_throttle_and_steer(captured):
+def test_telegraph_steps_and_rudder_holds(captured):
     game = Game(world=default_world(), state_interval=float("inf"))
-    start = game.world.player.heading
-    for _ in range(40):
-        game.apply(Controls(throttle_up=True, starboard=True), 0.1)
-        game.update(0.1)
     sub = game.world.player
-    assert sub.throttle == 1.0
-    assert sub.rudder == 1.0
+    start = sub.heading
+    assert sub.telegraph == TELEGRAPH_STOP and sub.telegraph_label == "STOP"
+    game.apply(Controls(throttle_up=True), 0.1)
+    assert sub.telegraph_label == "AHEAD SLOW" and sub.throttle == 0.25
+    for _ in range(10):  # extra presses stop at the last position
+        game.apply(Controls(throttle_up=True), 0.1)
+    assert sub.telegraph_label == "AHEAD FLANK" and sub.throttle == 1.0
+    for _ in range(20):
+        game.apply(Controls(throttle_down=True), 0.1)
+    assert sub.telegraph_label == TELEGRAPH[0][0] == "ASTERN FULL" and sub.throttle == -1.0
+    for _ in range(6):
+        game.apply(Controls(throttle_up=True), 0.1)
+    assert sub.telegraph_label == "AHEAD FLANK"
+    # The rudder ramps while D is held and stays put when it is released.
+    for _ in range(10):
+        game.apply(Controls(starboard=True), 0.1)
+        game.update(0.1)
+    assert sub.rudder == pytest.approx(0.5)
+    assert sub.rudder_label in ("RUDDER 17 STBD", "RUDDER 18 STBD")  # 0.5 * 35 = 17.5
+    for _ in range(30):
+        game.apply(Controls(), 0.1)
+        game.update(0.1)
+    assert sub.rudder == pytest.approx(0.5)
     assert sub.speed > 0.0
     assert 0.0 < angle_diff(sub.heading, start) < 180.0
+    game.apply(Controls(rudder_center=True), 0.1)
+    assert sub.rudder == 0.0 and sub.rudder_label == "RUDDER AMIDSHIPS"
+    for _ in range(30):
+        game.apply(Controls(port=True), 0.1)
+    assert sub.rudder == -1.0 and sub.rudder_label == "RUDDER 35 PORT"
     game.apply(Controls(dive_toggle=True), 0.1)
     assert sub.target_depth > 0.0
     game.apply(Controls(deep=True), 0.1)
@@ -102,7 +125,12 @@ def test_target_and_solution_follow_the_nearest_visual_contact(captured):
     assert (snap["solution"] is None) == (sol is None)
     game.world.player.depth = game.world.player.target_depth = 60.0
     game.update(0.1)
-    assert game.target() is None and game.solution() is None
+    sonar = game.target()  # deep and slow: the hydrophones still hold them
+    assert sonar is not None and sonar.method == "hydrophone"
+    assert game.solution() is None  # but there is no firing solution without the periscope
+    game.world.player.speed = 6.0 * 0.514444  # too fast for the hydrophones
+    game.update(0.1)
+    assert game.target() is None
 
 
 def test_describe_covers_every_player_facing_event():

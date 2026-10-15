@@ -35,6 +35,14 @@ def test_headless_script_moves_and_dives(capsys):
     assert len(final["ships"]) == 3
 
 
+def test_headless_telegraph_order(capsys):
+    script = json.dumps([{"t": 0, "telegraph": "ahead half"}])
+    assert main(["--headless", "--seconds", "5", "--seed", "1", "--script", script]) == 0
+    final = events_from(capsys.readouterr().out)[-1]
+    assert final["player"]["throttle"] == 0.5
+    assert final["player"]["telegraph"] == "AHEAD HALF"
+
+
 def test_headless_fire_deep_and_time_scale_orders(capsys):
     script = json.dumps([{"t": 0, "fire": True}, {"t": 1, "deep": True}, {"t": 2, "time_scale": 4}])
     assert main(["--headless", "--seconds", "10", "--seed", "1", "--script", script]) == 0

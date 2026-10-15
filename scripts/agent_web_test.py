@@ -2,7 +2,7 @@
 """Drive a web build in headless Chromium the way an LLM agent would.
 
     uv run python scripts/agent_web_test.py https://pandazxx.github.io/jenesboat-v2/builds/abc1234/
-    uv run python scripts/agent_web_test.py http://127.0.0.1:9000/ --keys W:3,D:2 --screenshot s.png
+    uv run python scripts/agent_web_test.py http://127.0.0.1:9000/ --keys W:0.3,D:2
 
 Loads the page, waits for the game's ``JENESBOAT {"event":"ready"}`` console line, presses
 keys, collects ``state`` events, takes a screenshot and prints a JSON summary.  Exit code is
@@ -45,7 +45,11 @@ def parse_keys(spec: str) -> list[tuple[str, float]]:
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("url")
-    p.add_argument("--keys", default="W:3,D:2", help="key:seconds sequence, '' for none")
+    p.add_argument(
+        "--keys",
+        default="W:0.3,W:0.3,W:0.3,W:0.3,D:2",
+        help="key:seconds sequence ('' for none); W steps the telegraph once per press",
+    )
     p.add_argument("--settle", type=float, default=2.0, help="seconds to observe after keys")
     p.add_argument("--ready-timeout", type=float, default=240.0)
     p.add_argument("--screenshot", default="dist/agent/web.png")

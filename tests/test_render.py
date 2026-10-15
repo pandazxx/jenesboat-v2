@@ -6,6 +6,23 @@ from jenesboat_v2.game import Controls, Game
 from jenesboat_v2.sim import default_world
 from jenesboat_v2.sim.params import TYPE_VIIC
 
+# Positional argument counts of the pyray functions the renderer is allowed to use.  These
+# signatures are the same in raylib 5 (the browser wheel) and 6 (native); anything else
+# (e.g. draw_circle_gradient, which changed between the two) must not be called.
+PYRAY_ARITY = {
+    "begin_drawing": 0,
+    "end_drawing": 0,
+    "clear_background": 1,
+    "draw_line": 5,
+    "draw_line_ex": 4,
+    "draw_pixel": 3,
+    "draw_circle_v": 3,
+    "draw_circle_lines": 4,
+    "draw_rectangle_pro": 4,
+    "draw_rectangle_lines": 5,
+    "draw_text": 5,
+}
+
 
 class FakeRL:
     def __init__(self):
@@ -25,13 +42,14 @@ class FakeRL:
         return len(text) * size // 2
 
     def __getattr__(self, name):
-        if name.startswith("draw_") or name in ("begin_drawing", "end_drawing", "clear_background"):
+        if name in PYRAY_ARITY:
 
             def record(*args):
+                assert len(args) == PYRAY_ARITY[name], f"{name} called with {len(args)} args"
                 self.calls.append(name)
 
             return record
-        raise AttributeError(name)
+        raise AttributeError(f"{name}: not in the allowed pyray call table")
 
 
 def draw(game: Game) -> list[str]:
@@ -92,6 +110,7 @@ def test_draws_the_intel_cue_on_and_off_screen_and_the_last_seen_cue():
     contact = Game(world=default_world(), state_interval=float("inf"))
     contact.update(0.1)
     contact.world.player.depth = contact.world.player.target_depth = TYPE_VIIC.deep_depth
+    contact.world.player.speed = 6.0 * 0.514444  # deep and noisy: no sensor holds them
     contact.update(0.1)
     assert contact.world.cue()["kind"] == "last_seen"
     draw(contact)
@@ -108,3 +127,12 @@ def test_close_zoom_draws_the_minor_grid_and_the_own_track():
     near = draw(game)
     assert near.count("draw_line") >= 15  # 200 m grid lines across a 1.9 x 1.1 km view
     assert "draw_pixel" in near and "draw_pixel" in far  # the boat's own track
+
+
+def test_draws_sonar_ghosts_and_the_sonar_target_panel():
+    game = Game(world=default_world(), state_interval=float("inf"))
+    game.world.player.depth = game.world.player.target_depth = TYPE_VIIC.deep_depth
+    game.update(0.1)
+    assert game.target().method == "hydrophone"
+    calls = draw(game)
+    assert calls.count("draw_rectangle_pro") == 3  # ghost hulls at the estimated positions

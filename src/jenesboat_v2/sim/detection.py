@@ -24,7 +24,9 @@ HYDROPHONE = "hydrophone"
 
 @dataclass(frozen=True)
 class Contact:
-    """What the boat knows about one ship.  Hydrophone contacts have a bearing only."""
+    """What the boat knows about one ship.  A hydrophone contact is the operator's estimate
+    (position, course and speed from the bearing and the screw noise) and cannot tell the
+    ship type; a visual contact is exact and identified."""
 
     ship_id: str
     method: str
@@ -42,7 +44,7 @@ class Contact:
             "method": self.method,
             "bearing": round(self.bearing, 1),
         }
-        if self.method == VISUAL:
+        if self.x is not None:
             data.update(
                 type=self.type,
                 range=round(self.range or 0.0, 0),
@@ -100,7 +102,17 @@ def observe(sub: Submarine, ship: Ship, light: float = 1.0) -> Contact | None:
             speed=ship.speed,
         )
     if d <= sub_hydrophone_range(sub, ship.type) and abs(ship.speed) > 0.1:
-        return Contact(ship_id=ship.ship_id, method=HYDROPHONE, bearing=brg, type="")
+        return Contact(
+            ship_id=ship.ship_id,
+            method=HYDROPHONE,
+            bearing=brg,
+            type="",
+            range=d,
+            x=ship.x,
+            y=ship.y,
+            heading=ship.heading,
+            speed=ship.speed,
+        )
     return None
 
 

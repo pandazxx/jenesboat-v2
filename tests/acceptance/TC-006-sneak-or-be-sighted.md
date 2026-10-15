@@ -15,7 +15,7 @@ Visual contact with the group, boat surfaced, more than 7 km away (`RNG` above 7
 2. Stay surfaced and steer straight at the group at full throttle until the nearest ship is
    inside the red circle (`RNG` below 6.0 km).
 3. Press `R` for a new hunt and repeat the approach, but press `Space` (periscope depth) when
-   `RNG` is about 7 km and press `S` until `THR +0.20` (about 3 kn or less).
+   `RNG` is about 7 km and press `S` until `AHEAD SLOW` (1.9 kn submerged).
 4. Let the group pass about 1.5 km away.
 
 ## Expected

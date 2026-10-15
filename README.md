@@ -24,8 +24,9 @@ The major enemy ship types are merchant and military ships. They offen comes in 
 
 | key   | action                                                   |
 | ----- | -------------------------------------------------------- |
-| W / S | throttle up / down (held)                                |
-| A / D | rudder port / starboard (held)                           |
+| W / S | engine telegraph one position ahead / astern (ASTERN FULL, ASTERN HALF, STOP, AHEAD SLOW, AHEAD HALF, AHEAD FULL, AHEAD FLANK) |
+| A / D | rudder to port / starboard while held (hard over in 2 s); it stays where released |
+| Q     | rudder amidships                                         |
 | Space | surfaced -> periscope depth -> surfaced; deep -> periscope depth |
 | C     | go deep (60 m)                                           |
 | F     | fire a torpedo along the heading                         |

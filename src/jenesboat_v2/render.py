@@ -11,7 +11,7 @@ import math
 
 from jenesboat_v2._build_info import BUILD_ID
 from jenesboat_v2.game import Game
-from jenesboat_v2.sim.detection import HYDROPHONE, VISUAL, ship_detection_range
+from jenesboat_v2.sim.detection import HYDROPHONE, ship_detection_range
 from jenesboat_v2.sim.geo import angle_on_bow, bearing, project
 from jenesboat_v2.sim.scenario import INTEL_POSITION_ERROR
 
@@ -21,8 +21,11 @@ GRID_MINOR = (18, 44, 78, 255)
 GRID_LABEL = (80, 112, 156, 255)
 OWN_TRACK = (90, 110, 140, 255)
 CUE = (230, 190, 110, 255)
+CUE_BLUR = (230, 190, 110, 22)  # one layer; the blur is several of these stacked
+BLUR_LAYERS = 6
 EDGE = (60, 90, 130, 255)
 HULL_MERCHANT = (200, 200, 200, 255)
+HULL_SONAR = (120, 200, 160, 110)  # a ghost: position from the hydrophones, not seen
 HULL_MILITARY = (240, 120, 90, 255)
 WRECK = (110, 110, 120, 255)
 SUB_SURFACED = (255, 230, 120, 255)
@@ -40,7 +43,7 @@ HUD_DIM = (150, 160, 170, 255)
 ALERT = (255, 120, 90, 255)
 
 TRACK_LENGTH = 12_000.0  # m of projected track drawn ahead of the target
-HUD_TOP = 84  # px reserved for the HUD text at the top
+HUD_TOP = 104  # px reserved for the HUD text at the top
 PANEL_BOTTOM = 150  # px, below the contact panel on the right
 EDGE_MARGIN = 28  # px, where off-screen cue arrows sit
 MINOR_GRID_MAX_ZOOM = 5.0  # m/px; closer than this a 200 m grid is drawn too
@@ -77,17 +80,20 @@ def draw(rl, game: Game, width: int, height: int) -> None:
     for ship in world.ships:
         if ship.sunk:
             _draw_wreck(rl, cam, ship.x, ship.y)
-    for contact in world.contacts:
-        if contact.method == HYDROPHONE:
-            _draw_bearing_line(rl, cam, sub.x, sub.y, contact.bearing)
     target = game.target()
     for contact in world.contacts:
-        if contact.method == VISUAL and contact.x is not None:
-            ship = world.ship(contact.ship_id)
+        if contact.x is None or contact.y is None:
+            continue
+        ship = world.ship(contact.ship_id)
+        if contact.method == HYDROPHONE:
+            # Confirmed on the hydrophones: the bearing line and a ghost of the ship.
+            _draw_bearing_line(rl, cam, sub.x, sub.y, contact.bearing)
+            color = HULL_SONAR
+        else:
             color = HULL_MILITARY if ship.kind == "military" else HULL_MERCHANT
-            if target is not None and contact.ship_id == target.ship_id:
-                _draw_dashed(rl, cam, ship.x, ship.y, ship.heading, TRACK_LENGTH, TRACK)
-            _draw_hull(rl, cam, ship.x, ship.y, ship.heading, ship.speed, ship.params, color)
+        if target is not None and contact.ship_id == target.ship_id:
+            _draw_dashed(rl, cam, ship.x, ship.y, ship.heading, TRACK_LENGTH, TRACK)
+        _draw_hull(rl, cam, ship.x, ship.y, ship.heading, ship.speed, ship.params, color)
 
     for torp in world.torpedoes:
         _draw_torpedo(rl, cam, torp)
@@ -147,20 +153,22 @@ def _draw_own_track(rl, cam: Camera, track: list[tuple[float, float]], x: float,
 
 
 def _draw_cue(rl, cam: Camera, cue: dict | None) -> None:
-    """The intel report (or the last-seen position): a dashed circle with a course tick on the
-    map, and an arrow at the screen edge pointing at it when it is off-screen."""
+    """Where the enemy probably is while nothing is held on the sensors: a blurred circle
+    (its size is the uncertainty) with a course tick when on screen, otherwise an arrow at
+    the edge of the map area pointing the way."""
     if cue is None:
         return
     label = "INTEL" if cue["kind"] == "intel" else f"LAST SEEN {cue['ship']}"
     text = f"{label}  {cue['bearing']:03.0f}  {cue['range'] / 1000:.1f} km"
     radius_m = INTEL_POSITION_ERROR if cue["kind"] == "intel" else 1_000.0
     sx, sy = cam.to_screen(cue["x"], cue["y"])
-    _draw_dashed_circle(rl, sx, sy, max(8.0, cam.px(radius_m)), CUE)
-    tx, ty = project(cue["x"], cue["y"], cue["course"], radius_m * 1.5)
-    stx, sty = cam.to_screen(tx, ty)
-    rl.draw_line_ex(rl.Vector2(sx, sy), rl.Vector2(stx, sty), 1.0, _color(rl, CUE))
     on_screen = 0 <= sx <= cam.width and HUD_TOP <= sy <= cam.height - 70
     if on_screen:
+        radius = max(16.0, cam.px(radius_m))
+        _draw_blur(rl, sx, sy, radius, CUE_BLUR)
+        tx, ty = project(cue["x"], cue["y"], cue["course"], radius_m * 1.5)
+        stx, sty = cam.to_screen(tx, ty)
+        rl.draw_line_ex(rl.Vector2(sx, sy), rl.Vector2(stx, sty), 1.0, _color(rl, CUE))
         rl.draw_text(text, int(sx) + 8, int(sy) + 8, 14, _color(rl, CUE))
         return
     # Off-screen: an arrow on the edge of the map area, pointing the way.
@@ -184,13 +192,13 @@ def _draw_cue(rl, cam: Camera, cue: dict | None) -> None:
     rl.draw_text(text, lx, ly, 14, _color(rl, CUE))
 
 
-def _draw_dashed_circle(rl, sx: float, sy: float, radius: float, rgba, dashes: int = 24) -> None:
-    for i in range(0, dashes, 2):
-        a0 = 2 * math.pi * i / dashes
-        a1 = 2 * math.pi * (i + 1) / dashes
-        p0 = rl.Vector2(sx + math.cos(a0) * radius, sy + math.sin(a0) * radius)
-        p1 = rl.Vector2(sx + math.cos(a1) * radius, sy + math.sin(a1) * radius)
-        rl.draw_line_ex(p0, p1, 1.0, _color(rl, rgba))
+def _draw_blur(rl, sx: float, sy: float, radius: float, rgba) -> None:
+    """A soft disc: translucent circles stacked from the full radius inward, so the centre
+    is brightest and the edge fades out (draw_circle_gradient differs between raylib 5 and
+    6, so it is avoided)."""
+    for i in range(BLUR_LAYERS):
+        r = radius * (1.0 - i / BLUR_LAYERS)
+        rl.draw_circle_v(rl.Vector2(sx, sy), r, _color(rl, rgba))
 
 
 def _draw_hull(rl, cam: Camera, x, y, heading, speed, params, rgba) -> None:
@@ -286,9 +294,9 @@ def _draw_hud(rl, game: Game, width: int, height: int) -> None:
     tubes = sub.tubes
     line1 = (
         f"HDG {sub.heading:05.1f}   SPD {sub.speed_knots:5.1f} kn   "
-        f"THR {sub.throttle:+.2f}   RUD {sub.rudder:+.1f}   "
-        f"POS {sub.x / 1000:.1f}E {sub.y / 1000:.1f}N"
+        f"{sub.telegraph_label}   {sub.rudder_label}"
     )
+    line1b = f"POS {sub.x / 1000:.2f}E {sub.y / 1000:.2f}N   LOG {world.player_log / 1852:.2f} nm"
     line2 = (
         f"DEPTH {sub.depth:5.1f} m -> {sub.target_depth:5.1f} m   {sub.depth_band.upper()}"
         f"   BATT {sub.battery * 100:3.0f}%"
@@ -305,6 +313,7 @@ def _draw_hud(rl, game: Game, width: int, height: int) -> None:
     rl.draw_text(line1, 10, 10, 20, _color(rl, HUD))
     rl.draw_text(line2, 10, 34, 20, _color(rl, HUD))
     rl.draw_text(line3, 10, 58, 20, _color(rl, HUD))
+    rl.draw_text(line1b, 10, 82, 16, _color(rl, HUD_DIM))
 
     _draw_contact_panel(rl, game, width)
 
@@ -313,7 +322,7 @@ def _draw_hud(rl, game: Game, width: int, height: int) -> None:
         rl.draw_text(f"{t / 60:5.1f}m  {text}", 10, y, 16, _color(rl, HUD_DIM))
         y += 18
     rl.draw_text(
-        "W/S thr  A/D rud  SPACE dive/surf  C deep  F fire  -/= zoom  1-4 time  R new",
+        "W/S telegraph  A/D rudder  Q amidships  SPACE dive  C deep  F fire  -/= zoom  1-4 time  R",
         10,
         height - 26,
         16,
@@ -346,7 +355,8 @@ def _draw_contact_panel(rl, game: Game, width: int) -> None:
         ship = world.ship(target.ship_id)
         aob = angle_on_bow(target.heading or 0.0, bearing(target.x, target.y, sub.x, sub.y))
         side = "S" if aob >= 0 else "P"
-        lines.append((f"TGT {target.ship_id}", HUD))
+        sonar = target.method == HYDROPHONE
+        lines.append((f"{'SONAR' if sonar else 'TGT'} {target.ship_id}", HYDRO if sonar else HUD))
         lines.append((f"BRG {target.bearing:03.0f}  RNG {(target.range or 0) / 1000:4.1f} km", HUD))
         spd = (target.speed or 0.0) / 0.514444
         lines.append(
@@ -355,7 +365,9 @@ def _draw_contact_panel(rl, game: Game, width: int) -> None:
         if ship.alerted(world.time):
             lines.append(("RUNNING", ALERT))
         sol = game.solution()
-        if sol is None:
+        if sonar:
+            lines.append(("sonar estimate: periscope needed to shoot", HUD_DIM))
+        elif sol is None:
             lines.append(("no solution: tracks do not cross in range", HUD_DIM))
         else:
             ok = abs(sol.error) <= ship.params.length / 2
@@ -364,13 +376,7 @@ def _draw_contact_panel(rl, game: Game, width: int) -> None:
             text = f"run {sol.run / 1000:3.1f} km  {sol.time:3.0f} s  {lead}  {when}"
             lines.append((text, LEAD_OK if ok else HUD_DIM))
     else:
-        hydro = [c for c in world.contacts if c.method == HYDROPHONE]
-        if hydro:
-            lines.append((f"hydrophone: {len(hydro)} contact(s)", HYDRO))
-            for c in hydro[:3]:
-                lines.append((f"  {c.ship_id} bearing {c.bearing:03.0f}", HYDRO))
-        else:
-            lines.append(("no contact", HUD_DIM))
+        lines.append(("no contact", HUD_DIM))
         cue = world.cue()
         if cue is not None:
             what = "intel" if cue["kind"] == "intel" else f"last seen {cue['ship']}"

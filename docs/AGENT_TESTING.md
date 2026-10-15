@@ -20,9 +20,10 @@ just sim --seconds 30 --trace --seed 7 \
 ```
 
 `--seed` picks the hunt (same seed, same world); `--seconds` is game time before time
-compression. Order keys: `throttle` and `rudder` (-1..1), `dive` (Space: one band shallower, or
-periscope depth from the surface), `deep` (C), `target_depth` (metres), `fire` (F),
-`time_scale` (1, 2, 4 or 8).
+compression. Order keys: `throttle` (-1..1) or `telegraph` (`"ahead half"`, `"stop"`, ...),
+`rudder` (-1..1, +1 = 35° starboard, stays until the next order), `dive` (Space: one band
+shallower, or periscope depth from the surface), `deep` (C), `target_depth` (metres), `fire`
+(F), `time_scale` (1, 2, 4 or 8).
 
 Events (one JSON object per line, `t` in game seconds): `ready`, `intel` (the radio report:
 approximate bearing/range/course of the group), `order`, `contact` / `contact_lost`
@@ -33,7 +34,7 @@ A `state`/`final` payload looks like:
 
 ```json
 {"event":"state","t":30.0,"seed":7,"time_scale":1,"zoom":20.0,
- "player":{"x":20000.0,"y":20000.0,"heading":35.0,"speed_kn":12.1,"throttle":1.0,"rudder":1.0,
+ "player":{"x":20000.0,"y":20000.0,"heading":35.0,"speed_kn":12.1,"throttle":1.0,"telegraph":"AHEAD FLANK","rudder":1.0,
            "depth":12.0,"target_depth":12.0,"surfaced":false,"band":"periscope",
            "battery":0.998,"tubes":{"loaded":3,"reserves":8,"reload":12.0},"can_fire":true},
  "ships":[{"id":"freighter-1","kind":"merchant","type":"freighter","x":...,"heading":212.0,
@@ -41,18 +42,20 @@ A `state`/`final` payload looks like:
  "contacts":[{"id":"freighter-1","method":"hydrophone","bearing":38.0}, ...],
  "torpedoes":[{"id":1,"x":...,"y":...,"heading":35.0,"run":450.0,"armed":true,"alive":true}],
  "target":"freighter-1","solution":{"run":1800.0,"time":117.0,"error":-12.0},
- "tonnage":0,"mission":{"status":"active","sunk":[],"escaped":[],"remaining":[...],
-                        "tonnage":0,"torpedoes_left":11},
+ "tonnage":0,"log_nm":1.25,
+ "mission":{"status":"active","sunk":[],"escaped":[],"remaining":[...],
+            "tonnage":0,"torpedoes_left":11},
  "cue":{"kind":"intel","ship":null,"x":...,"y":...,"course":212.0,"bearing":38.0,"range":15600.0},
  "world":{"width":40000.0,"height":40000.0,"light":1.0}}
 ```
 
-`contacts` is what the boat knows (visual contacts carry position, course and speed;
-hydrophone contacts only a bearing); `ships` is ground truth for checking. `solution` is the
+`contacts` is what the boat knows: visual contacts are exact and carry the ship `type`;
+hydrophone contacts are the operator's estimate of position, course and speed with an empty
+`type` and never yield a firing solution. `ships` is ground truth for checking. `solution` is the
 fire-control helper for the nearest visual contact: `error` near 0 means a torpedo fired now
 along the heading meets the target. `cue` is where to look when nothing is in sight: the intel
-report, or the dead-reckoned position of the ship seen last (`kind` = `last_seen`); `null`
-while a ship is in sight. `tests/test_hunt.py` shows a scripted skipper that uses
+report, or the dead-reckoned position of the ship fixed last (`kind` = `last_seen`); `null`
+while any ship is held visually or on the hydrophones. `tests/test_hunt.py` shows a scripted skipper that uses
 exactly these to ambush the group; it is the template for an agent playing a build.
 
 ## 3. The web build in a headless browser
@@ -64,12 +67,13 @@ same `JENESBOAT` events to the browser console, so a Playwright script can drive
 ```sh
 just agent-setup                 # once: downloads headless Chromium
 just agent-web-test https://pandazxx.github.io/jenesboat-v2/builds/<name>/ \
-  --keys "W:3,D:2" --screenshot dist/agent/web.png
+  --keys "W:0.3,W:0.3,W:0.3,W:0.3,D:2" --screenshot dist/agent/web.png
 ```
 
 The script waits for the `ready` event (the first load fetches the Python runtime from the
 pygbag CDN and can take a minute), focuses the canvas, holds the given keys for the given
-seconds, then prints and writes (`dist/agent/web.json`) a summary:
+seconds (each `W` press is one telegraph position, so four presses order AHEAD FLANK), then
+prints and writes (`dist/agent/web.json`) a summary:
 
 ```json
 {"ok": true, "ready": {"event":"ready","build":"abc1234", ...},
@@ -100,8 +104,9 @@ and summary as the `agent-smoke-<name>` artifact.
 
 | key   | action                                                   |
 | ----- | -------------------------------------------------------- |
-| W / S | throttle up / down (held)                                |
-| A / D | rudder port / starboard (held)                           |
+| W / S | engine telegraph one position ahead / astern (ASTERN FULL, ASTERN HALF, STOP, AHEAD SLOW, AHEAD HALF, AHEAD FULL, AHEAD FLANK) |
+| A / D | rudder to port / starboard while held (hard over in 2 s); it stays where released |
+| Q     | rudder amidships                                         |
 | Space | surfaced -> periscope depth -> surfaced; deep -> periscope depth |
 | C     | go deep (60 m)                                           |
 | F     | fire a torpedo along the heading                         |

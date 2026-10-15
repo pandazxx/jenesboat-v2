@@ -11,7 +11,7 @@ Fresh hunt, boat surfaced, `BATT 100%`.
 ## Steps
 
 1. Press `C`. Wait until `DEPTH 60.0 m`.
-2. Hold `W` to `THR +1.00` for one minute at x8 (press `4`).
+2. Press `W` four times (`AHEAD FLANK`) for one minute at x8 (press `4`).
 3. Press `Space` once, then once more after reaching 12 m.
 4. Press `1`, `2`, `3`, `4` in turn and watch the `t=` counter at the bottom right.
 5. Press `-` and `=` several times.
