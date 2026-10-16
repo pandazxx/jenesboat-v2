@@ -1,5 +1,18 @@
 [
   {
+    "built_at": "2026-10-16T12:40:48+00:00",
+    "cdn": "https://pygame-web.github.io/archives/0.9/",
+    "kind": "pr",
+    "name": "d0ffa87",
+    "pr": 15,
+    "pybuild": "3.12",
+    "ref": "topic/m1-35e379f",
+    "run_url": "https://github.com/pandazxx/jenesboat-v2/actions/runs/38902151748",
+    "sha": "d0ffa872a99173876fbd1213df58c36ddacb5494",
+    "title": "Milestone 1: merchant hunting - parameters, submarine tuning, visibility, merchant AI, torpedoes, hunt loop",
+    "url": "builds/d0ffa87/"
+  },
+  {
     "built_at": "2026-10-16T05:29:16+00:00",
     "cdn": "https://pygame-web.github.io/archives/0.9/",
     "kind": "pr",
