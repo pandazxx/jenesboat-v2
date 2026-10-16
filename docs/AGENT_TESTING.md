@@ -23,7 +23,8 @@ just sim --seconds 30 --trace --seed 7 \
 compression. Order keys: `throttle` (-1..1) or `telegraph` (`"ahead half"`, `"stop"`, ...),
 `rudder` (-1..1, +1 = 35° starboard, stays until the next order), `dive` (Space: one band
 shallower, or periscope depth from the surface), `deep` (C), `target_depth` (metres), `fire`
-(F), `time_scale` (1, 2, 4 or 8), `pause` (toggle; the headless clock keeps running but the world
+(F), `time_scale` (1, 2, 4 or 8), `target` (a ship id, or `null` for automatic), `next_target`,
+`pause` (toggle; the headless clock keeps running but the world
 does not, so a paused stretch shortens the simulated time).
 
 Events (one JSON object per line, `t` in game seconds): `ready`, `intel` (the radio report:
@@ -70,7 +71,7 @@ same `JENESBOAT` events to the browser console, so a Playwright script can drive
 ```sh
 just agent-setup                 # once: downloads headless Chromium
 just agent-web-test https://pandazxx.github.io/jenesboat-v2/builds/<name>/ \
-  --keys "W:0.3,W:0.3,W:0.3,W:0.3,D:2" --screenshot dist/agent/web.png
+  --keys "W:0.3,W:0.3,W:0.3,W:0.3,D:2" --dpr 2 --screenshot dist/agent/web.png
 ```
 
 The script waits for the `ready` event (the first load fetches the Python runtime from the
@@ -84,6 +85,8 @@ prints and writes (`dist/agent/web.json`) a summary:
  "player_moved_m": 41.3, "speed_kn": 4.9, "screenshot": "dist/agent/web.png"}
 ```
 
+`--dpr 2` emulates a high-DPI (Retina) screen, where the browser's GL buffer is twice the
+window size; CI uses it so the screenshot proves the game fills the canvas there too.
 Exit code 0 means: ready, state events flowing and the submarine moved when keys were held.
 On failure the summary contains the console tail and page errors. Look at the screenshot to
 judge rendering (ocean grid in km, yellow submarine dot with its red visibility circle, HUD;
@@ -113,6 +116,7 @@ and summary as the `agent-smoke-<name>` artifact.
 | Space | surfaced -> periscope depth -> surfaced; deep -> periscope depth |
 | C     | go deep (60 m)                                           |
 | F     | fire a torpedo along the heading                         |
+| T     | next target (cycles through the contacts; otherwise the nearest is the target) |
 | - / = | zoom out / in                                            |
 | 1-4   | time compression x1 / x2 / x4 / x8                       |
 | P     | pause / resume                                           |

@@ -40,6 +40,7 @@ class Controls:
     zoom_in: bool = False
     zoom_out: bool = False
     time_scale: int | None = None  # one of TIME_SCALES: switch to that compression
+    next_target: bool = False  # select the next contact
     legend: bool = False  # toggle the symbol legend
     pause: bool = False  # toggle pause
     restart: bool = False
@@ -63,6 +64,7 @@ class Game:
         self.restarts = 0
         self.show_legend = True  # on until the player hides it with L
         self.paused = False
+        self.selected: str | None = None  # ship id chosen with T, else the nearest contact
         self.messages.append((0.0, objective(self.world)))
         self._drain()
 
@@ -95,6 +97,8 @@ class Game:
             self.zoom_index = min(len(ZOOM_LEVELS) - 1, self.zoom_index + 1)
         if controls.time_scale is not None:
             self.set_time_scale(controls.time_scale)
+        if controls.next_target:
+            self.next_target()
         if controls.legend:
             self.show_legend = not self.show_legend
         if controls.pause:
@@ -121,6 +125,7 @@ class Game:
         self.world = hunting_scenario(self.seed)
         self.messages.clear()
         self.paused = False
+        self.selected = None
         self._since_state = 0.0
         events.emit("restart", seed=self.seed)
         self.messages.append((0.0, objective(self.world)))
@@ -162,14 +167,38 @@ class Game:
 
     # --- what the HUD shows ----------------------------------------------------------------
 
+    def contacts_by_range(self) -> list[Contact]:
+        """Visual contacts first, each group nearest first."""
+        return sorted(self.world.contacts, key=lambda c: (c.method != VISUAL, c.range or math.inf))
+
     def target(self) -> Contact | None:
-        """The nearest visual contact (the one the fire-control helper tracks), or failing
-        that the nearest hydrophone contact (shown as an estimate, no solution)."""
-        visual = [c for c in self.world.contacts if c.method == VISUAL]
-        pool = visual or self.world.contacts
+        """The contact chosen with T while it is still held, else the nearest visual contact
+        (the fire-control helper tracks it), else the nearest hydrophone contact (an
+        estimate, no solution)."""
+        pool = self.contacts_by_range()
         if not pool:
             return None
-        return min(pool, key=lambda c: c.range or math.inf)
+        chosen = next((c for c in pool if c.ship_id == self.selected), None)
+        return chosen or pool[0]
+
+    def select_target(self, ship_id: str | None) -> bool:
+        """Pick a contact by id (``None`` returns to automatic); ``False`` if not held."""
+        if ship_id is not None and all(c.ship_id != ship_id for c in self.world.contacts):
+            return False
+        self.selected = ship_id
+        return True
+
+    def next_target(self) -> Contact | None:
+        """Cycle through the current contacts (nearest first, visual before sonar)."""
+        pool = self.contacts_by_range()
+        if not pool:
+            self.selected = None
+            return None
+        current = self.target()
+        ids = [c.ship_id for c in pool]
+        index = ids.index(current.ship_id) if current else -1
+        self.selected = ids[(index + 1) % len(ids)]
+        return self.target()
 
     def solution(self) -> Solution | None:
         target = self.target()

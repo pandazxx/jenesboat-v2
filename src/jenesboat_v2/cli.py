@@ -36,7 +36,7 @@ def build_parser() -> argparse.ArgumentParser:
             '\'[{"t":0,"throttle":1},{"t":5,"rudder":1},{"t":8,"dive":true}]\'. '
             "Keys: throttle (-1..1) or telegraph ('ahead half', ...), rudder (-1..1), "
             "dive (toggle), deep, target_depth (m), fire, time_scale (1, 2, 4 or 8), "
-            "pause (toggle)."
+            "pause (toggle), target (ship id, or null for automatic), next_target."
         ),
     )
     return p
@@ -75,6 +75,10 @@ def run_headless(
                 game.fire()
             if order.get("pause"):
                 game.toggle_pause()
+            if "target" in order:
+                game.select_target(order["target"])
+            if order.get("next_target"):
+                game.next_target()
             events.emit("order", **order)
         game.update(dt)
         t += dt

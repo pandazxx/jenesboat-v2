@@ -20,7 +20,10 @@ Open the build URL in a desktop browser (Chrome, Firefox or Safari), any window 
 - Resizing keeps it centred and rescaled; the HUD text scales with the box and stays readable.
 - Keys still work after clicking anywhere on the game.
 
+- On a high-DPI (Retina) screen the game still fills the whole box: it is not drawn small in
+  the bottom-left quarter.
+
 ## Automated
 
 The CI job "Agent smoke test" screenshot (artifact `agent-smoke-<build>`) shows the placement
-at 1024x640.
+at 1024x640 with a device pixel ratio of 2.

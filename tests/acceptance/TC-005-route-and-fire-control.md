@@ -6,8 +6,8 @@ added_in: 15
 ---
 ## Preconditions
 
-A visual contact on the panel (`TGT ...`), boat surfaced or at periscope depth, `TUBES` not
-empty.
+A visual contact on the panel (`TGT ...`; `T` picks another, see TC-014), boat surfaced or at
+periscope depth, `TUBES` not empty.
 
 ## Steps
 

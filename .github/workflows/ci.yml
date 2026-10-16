@@ -109,7 +109,8 @@ jobs:
           (uv run python -m http.server 9000 --bind 127.0.0.1 --directory dist/web >/tmp/http.log 2>&1 &)
           sleep 1
           uv run python scripts/agent_web_test.py http://127.0.0.1:9000/ \
-            --keys "W:0.3,W:0.3,W:0.3,W:0.3,D:2" --screenshot dist/agent/web.png --out dist/agent/web.json
+            --keys "W:0.3,W:0.3,W:0.3,W:0.3,D:2" --dpr 2 \
+            --screenshot dist/agent/web.png --out dist/agent/web.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:

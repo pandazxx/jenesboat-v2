@@ -32,10 +32,30 @@ def read_controls(rl) -> Controls:
         zoom_in=rl.is_key_pressed(key.KEY_EQUAL),
         zoom_out=rl.is_key_pressed(key.KEY_MINUS),
         time_scale=scale,
+        next_target=rl.is_key_pressed(key.KEY_T),
         legend=rl.is_key_pressed(key.KEY_L),
         pause=rl.is_key_pressed(key.KEY_P),
         restart=rl.is_key_pressed(key.KEY_R),
     )
+
+
+def fit_viewport(rl, current: tuple[int, int] | None) -> tuple[int, int] | None:
+    """Stretch the GL viewport over the whole canvas buffer.
+
+    On high-DPI screens the browser GL buffer is devicePixelRatio times larger than the
+    960x540 window raylib asked for, and raylib's viewport stays 960x540 in the bottom-left
+    corner (GL's origin).  Drawing stays in 960x540 coordinates; only the viewport changes.
+    """
+    try:
+        canvas = platform.window.canvas  # type: ignore[attr-defined]
+        size = (int(canvas.width), int(canvas.height))
+    except Exception:  # noqa: BLE001 - no canvas (not in a browser page)
+        return current
+    if size == current or size[0] <= 0 or size[1] <= 0:
+        return current
+    rl.rl_viewport(0, 0, size[0], size[1])
+    events.emit("viewport", width=size[0], height=size[1])
+    return size
 
 
 async def run(max_seconds: float | None = None, seed: int | None = None) -> None:
@@ -48,6 +68,7 @@ async def run(max_seconds: float | None = None, seed: int | None = None) -> None
     if system == "Emscripten":
         # The page CSS (web/noctx.tmpl) centres and scales the canvas; this only focuses it.
         platform.window.window_resize()
+    viewport: tuple[int, int] | None = None
     rl.set_target_fps(60)
 
     events.emit("ready", build=BUILD_ID, sha=GIT_SHA, platform=system, width=WIDTH, height=HEIGHT)
@@ -61,6 +82,7 @@ async def run(max_seconds: float | None = None, seed: int | None = None) -> None
             ("S", controls.throttle_down),
             ("Q", controls.rudder_center),
             ("P", controls.pause),
+            ("T", controls.next_target),
             ("SPACE", controls.dive_toggle),
             ("C", controls.deep),
             ("F", controls.fire),
@@ -70,6 +92,8 @@ async def run(max_seconds: float | None = None, seed: int | None = None) -> None
                 events.emit("input", key=name)
         game.apply(controls, dt)
         game.update(dt)
+        if system == "Emscripten":
+            viewport = fit_viewport(rl, viewport)
         render.draw(rl, game, WIDTH, HEIGHT)
         if max_seconds is not None and game.world.time >= max_seconds:
             break

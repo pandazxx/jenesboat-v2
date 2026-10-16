@@ -160,3 +160,11 @@ def test_paused_banner():
     game = Game(seed=1, state_interval=float("inf"))
     game.apply(Controls(pause=True), 0.1)
     assert "draw_text" in draw(game)
+
+
+def test_every_contact_gets_a_projected_course_and_the_target_a_ring():
+    game = Game(world=default_world(), state_interval=float("inf"))
+    game.update(0.1)
+    calls = draw(game)
+    assert calls.count("draw_rectangle_pro") == 3
+    assert calls.count("draw_circle_lines") >= 2  # target ring + lookout circle

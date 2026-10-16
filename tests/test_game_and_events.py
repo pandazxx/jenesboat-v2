@@ -175,3 +175,29 @@ def test_pause_freezes_the_world_but_not_the_view(captured):
     game.apply(Controls(pause=True), 0.1)
     game.apply(Controls(restart=True), 0.1)
     assert not game.paused  # a new hunt starts running
+
+
+def test_target_selection_cycles_and_persists(captured):
+    game = Game(world=default_world(), state_interval=float("inf"))
+    game.update(0.1)
+    ids = [c.ship_id for c in game.contacts_by_range()]
+    assert ids[0] == "merchant-3" and len(ids) == 3  # nearest first
+    assert game.target().ship_id == "merchant-3" and game.selected is None
+    game.apply(Controls(next_target=True), 0.1)
+    assert game.selected == ids[1] and game.target().ship_id == ids[1]
+    game.apply(Controls(next_target=True), 0.1)
+    game.apply(Controls(next_target=True), 0.1)
+    assert game.target().ship_id == ids[0]  # wrapped around
+    assert game.select_target("merchant-1") and game.target().ship_id == "merchant-1"
+    for _ in range(50):
+        game.update(0.1)
+    assert game.target().ship_id == "merchant-1"  # sticks while held
+    assert not game.select_target("nobody")
+    game.world.ship("merchant-1").sunk = True
+    game.update(0.1)
+    assert game.target().ship_id == "merchant-3"  # lost: back to the nearest
+    assert game.select_target(None) and game.selected is None
+    game.world.player.depth = game.world.player.target_depth = 60.0
+    game.world.player.speed = 6.0 * 0.514444
+    game.update(0.1)
+    assert game.next_target() is None and game.target() is None

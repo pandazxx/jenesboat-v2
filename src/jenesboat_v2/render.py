@@ -32,6 +32,7 @@ SUB_SURFACED = (255, 230, 120, 255)
 SUB_SUBMERGED = (140, 170, 210, 255)
 WAKE = (90, 130, 170, 255)
 TRACK = (120, 150, 190, 255)
+TRACK_DIM = (70, 90, 120, 255)  # projected course of a contact that is not the target
 HYDRO = (120, 200, 160, 255)
 TORPEDO = (255, 255, 255, 255)
 AIM = (200, 180, 90, 160)
@@ -92,9 +93,16 @@ def draw(rl, game: Game, width: int, height: int) -> None:
             color = HULL_SONAR
         else:
             color = HULL_MILITARY if ship.kind == "military" else HULL_MERCHANT
-        if target is not None and contact.ship_id == target.ship_id:
-            _draw_dashed(rl, cam, ship.x, ship.y, ship.heading, TRACK_LENGTH, TRACK)
+        selected = target is not None and contact.ship_id == target.ship_id
+        _draw_dashed(
+            rl, cam, ship.x, ship.y, ship.heading, TRACK_LENGTH, TRACK if selected else TRACK_DIM
+        )
         _draw_hull(rl, cam, ship.x, ship.y, ship.heading, ship.speed, ship.params, color)
+        if selected:
+            sx, sy = cam.to_screen(ship.x, ship.y)
+            rl.draw_circle_lines(
+                int(sx), int(sy), max(10.0, cam.px(ship.params.length)), _color(rl, HUD)
+            )
 
     for torp in world.torpedoes:
         _draw_torpedo(rl, cam, torp)
@@ -330,7 +338,7 @@ def _draw_hud(rl, game: Game, width: int, height: int) -> None:
         rl.draw_text(f"{t / 60:5.1f}m  {text}", 10, y, 16, _color(rl, HUD_DIM))
         y += 18
     help_line = (
-        "W/S telegraph  A/D rudder  Q amidships  SPACE dive  C deep  F fire  "
+        "W/S telegraph  A/D rudder  Q midships  SPACE dive  C deep  F fire  T target  "
         "-/= zoom  1-4 time  P pause  L legend"
     )
     rl.draw_text(
@@ -369,7 +377,7 @@ LEGEND = (
     ("box", HULL_MERCHANT, "ship in sight (grey X: wreck)"),
     ("box", HULL_SONAR, "ship heard on the hydrophones (estimate)"),
     ("dash", HYDRO, "hydrophone bearing"),
-    ("dash", TRACK, "target's course, projected"),
+    ("dash", TRACK, "contact's course, projected (bright + ring: target, T)"),
     ("line", AIM, "torpedo track if fired now"),
     ("ring", LEAD_BAD, "where it crosses the target's course"),
     ("dot", LEAD_BAD, "target when the torpedo gets there"),
@@ -426,7 +434,10 @@ def _draw_contact_panel(rl, game: Game, width: int) -> None:
         aob = angle_on_bow(target.heading or 0.0, bearing(target.x, target.y, sub.x, sub.y))
         side = "S" if aob >= 0 else "P"
         sonar = target.method == HYDROPHONE
-        lines.append((f"{'SONAR' if sonar else 'TGT'} {target.ship_id}", HYDRO if sonar else HUD))
+        label = f"{'SONAR' if sonar else 'TGT'} {target.ship_id}"
+        if game.selected == target.ship_id:
+            label += " (T)"
+        lines.append((label, HYDRO if sonar else HUD))
         lines.append((f"BRG {target.bearing:03.0f}  RNG {(target.range or 0) / 1000:4.1f} km", HUD))
         spd = (target.speed or 0.0) / 0.514444
         lines.append(
@@ -445,6 +456,13 @@ def _draw_contact_panel(rl, game: Game, width: int) -> None:
             lead = f"lead {sol.error:+5.0f} m"
             text = f"run {sol.run / 1000:3.1f} km  {sol.time:3.0f} s  {lead}  {when}"
             lines.append((text, LEAD_OK if ok else HUD_DIM))
+        others = [c for c in game.contacts_by_range() if c.ship_id != target.ship_id]
+        for c in others[:4]:
+            how = "sonar" if c.method == HYDROPHONE else "seen"
+            text = f"{c.ship_id}  {c.bearing:03.0f}  {(c.range or 0) / 1000:4.1f} km  {how}"
+            lines.append((text, HYDRO if c.method == HYDROPHONE else HUD_DIM))
+        if others:
+            lines.append(("T: next target", HUD_DIM))
     else:
         lines.append(("no contact", HUD_DIM))
         cue = world.cue()

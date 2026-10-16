@@ -55,6 +55,12 @@ def main() -> int:
     p.add_argument("--screenshot", default="dist/agent/web.png")
     p.add_argument("--out", default="dist/agent/web.json", help="where to write the summary")
     p.add_argument("--headed", action="store_true")
+    p.add_argument(
+        "--dpr",
+        type=float,
+        default=1.0,
+        help="device pixel ratio to emulate (2 reproduces a HiDPI laptop screen)",
+    )
     args = p.parse_args()
     if args.url.startswith("http://localhost:8"):
         print(
@@ -81,10 +87,12 @@ def main() -> int:
     def has(event: str) -> bool:
         return any(e["event"] == event for e in events)
 
-    summary: dict = {"url": args.url, "ok": False}
+    summary: dict = {"url": args.url, "ok": False, "dpr": args.dpr}
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=not args.headed, args=["--use-gl=swiftshader"])
-        page = browser.new_page(viewport={"width": 1024, "height": 640})
+        page = browser.new_page(
+            viewport={"width": 1024, "height": 640}, device_scale_factor=args.dpr
+        )
         page.on("console", on_console)
         page.on("pageerror", lambda err: errors.append(str(err)))
         t0 = time.time()

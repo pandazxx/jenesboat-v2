@@ -53,6 +53,14 @@ def test_headless_pause_order_stops_the_clock(capsys):
     assert evs[-1]["t"] == pytest.approx(4.0)  # 6 s of wall clock, 2 of them paused
 
 
+def test_headless_target_orders(capsys):
+    script = json.dumps([{"t": 1, "next_target": True}, {"t": 2, "target": None}])
+    assert main(["--headless", "--seconds", "3", "--seed", "1", "--script", script]) == 0
+    evs = events_from(capsys.readouterr().out)
+    assert [e["event"] for e in evs].count("order") == 2
+    assert evs[-1]["target"] is None  # nothing in sight at the start of a hunt
+
+
 def test_headless_fire_deep_and_time_scale_orders(capsys):
     script = json.dumps([{"t": 0, "fire": True}, {"t": 1, "deep": True}, {"t": 2, "time_scale": 4}])
     assert main(["--headless", "--seconds", "10", "--seed", "1", "--script", script]) == 0

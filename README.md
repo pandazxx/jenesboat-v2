@@ -30,6 +30,7 @@ The major enemy ship types are merchant and military ships. They offen comes in 
 | Space | surfaced -> periscope depth -> surfaced; deep -> periscope depth |
 | C     | go deep (60 m)                                           |
 | F     | fire a torpedo along the heading                         |
+| T     | next target (cycles through the contacts; otherwise the nearest is the target) |
 | - / = | zoom out / in                                            |
 | 1-4   | time compression x1 / x2 / x4 / x8                       |
 | P     | pause / resume                                           |
