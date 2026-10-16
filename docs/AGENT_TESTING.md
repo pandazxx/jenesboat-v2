@@ -23,13 +23,14 @@ just sim --seconds 30 --trace --seed 7 \
 compression. Order keys: `throttle` (-1..1) or `telegraph` (`"ahead half"`, `"stop"`, ...),
 `rudder` (-1..1, +1 = 35° starboard, stays until the next order), `dive` (Space: one band
 shallower, or periscope depth from the surface), `deep` (C), `target_depth` (metres), `fire`
-(F), `time_scale` (1, 2, 4 or 8).
+(F), `time_scale` (1, 2, 4 or 8), `pause` (toggle; the headless clock keeps running but the world
+does not, so a paused stretch shortens the simulated time).
 
 Events (one JSON object per line, `t` in game seconds): `ready`, `intel` (the radio report:
 approximate bearing/range/course of the group), `order`, `contact` / `contact_lost`
 (`method` is `visual` or `hydrophone`), `alert` (merchants start running; `reason` is `sighted`
 or `torpedo`), `fire`, `fire_refused`, `hit`, `sunk` (with `tonnage`), `torpedo_lost`,
-`escaped`, `mission_end`, `restart`, `state` (every second with `--trace`), `final`.
+`escaped`, `mission_end`, `pause`, `restart`, `state` (every second with `--trace`), `final`.
 A `state`/`final` payload looks like:
 
 ```json
@@ -112,6 +113,7 @@ and summary as the `agent-smoke-<name>` artifact.
 | F     | fire a torpedo along the heading                         |
 | - / = | zoom out / in                                            |
 | 1-4   | time compression x1 / x2 / x4 / x8                       |
+| P     | pause / resume                                           |
 | L     | show / hide the symbol legend (on at the start)          |
 | R     | new hunt (new seed)                                      |
 

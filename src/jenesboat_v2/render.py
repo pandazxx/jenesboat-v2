@@ -311,7 +311,7 @@ def _draw_hud(rl, game: Game, width: int, height: int) -> None:
     )
     line3 = (
         f"TUBES {tubes.loaded}/{tubes.params.tubes}  RES {tubes.reserves}{reload}   "
-        f"TIME x{game.time_scale}   SUNK {world.tonnage:,} GRT"
+        f"TIME {'PAUSED' if game.paused else f'x{game.time_scale}'}   SUNK {world.tonnage:,} GRT"
     )
     rl.draw_text(line1, 10, 10, 20, _color(rl, HUD))
     rl.draw_text(line2, 10, 34, 20, _color(rl, HUD))
@@ -326,7 +326,7 @@ def _draw_hud(rl, game: Game, width: int, height: int) -> None:
         y += 18
     help_line = (
         "W/S telegraph  A/D rudder  Q amidships  SPACE dive  C deep  F fire  "
-        "-/= zoom  1-4 time  L legend"
+        "-/= zoom  1-4 time  P pause  L legend"
     )
     rl.draw_text(
         help_line,
@@ -343,6 +343,10 @@ def _draw_hud(rl, game: Game, width: int, height: int) -> None:
     tw = rl.measure_text(tag, 16)
     rl.draw_text(tag, width - tw - 10, height - 48, 16, _color(rl, HUD_DIM))
 
+    if game.paused:
+        text = "PAUSED  -  P to resume"
+        tw = rl.measure_text(text, 24)
+        rl.draw_text(text, (width - tw) // 2, height // 2 - 40, 24, _color(rl, HUD))
     mission = world.mission()
     if mission["status"] != "active":
         text = (

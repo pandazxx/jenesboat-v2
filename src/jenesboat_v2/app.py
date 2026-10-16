@@ -33,6 +33,7 @@ def read_controls(rl) -> Controls:
         zoom_out=rl.is_key_pressed(key.KEY_MINUS),
         time_scale=scale,
         legend=rl.is_key_pressed(key.KEY_L),
+        pause=rl.is_key_pressed(key.KEY_P),
         restart=rl.is_key_pressed(key.KEY_R),
     )
 
@@ -58,6 +59,7 @@ async def run(max_seconds: float | None = None, seed: int | None = None) -> None
             ("W", controls.throttle_up),
             ("S", controls.throttle_down),
             ("Q", controls.rudder_center),
+            ("P", controls.pause),
             ("SPACE", controls.dive_toggle),
             ("C", controls.deep),
             ("F", controls.fire),

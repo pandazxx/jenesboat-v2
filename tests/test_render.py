@@ -154,3 +154,9 @@ def test_legend_is_on_by_default_and_l_toggles_it():
     assert with_legend.count("draw_text") > without.count("draw_text")
     game.apply(Controls(legend=True), 0.1)
     assert game.show_legend
+
+
+def test_paused_banner():
+    game = Game(seed=1, state_interval=float("inf"))
+    game.apply(Controls(pause=True), 0.1)
+    assert "draw_text" in draw(game)

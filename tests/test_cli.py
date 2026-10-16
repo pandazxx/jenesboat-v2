@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from jenesboat_v2 import main
 from jenesboat_v2.events import parse
 
@@ -41,6 +43,14 @@ def test_headless_telegraph_order(capsys):
     final = events_from(capsys.readouterr().out)[-1]
     assert final["player"]["throttle"] == 0.5
     assert final["player"]["telegraph"] == "AHEAD HALF"
+
+
+def test_headless_pause_order_stops_the_clock(capsys):
+    script = json.dumps([{"t": 2, "pause": True}, {"t": 4, "pause": True}])
+    assert main(["--headless", "--seconds", "6", "--seed", "1", "--script", script]) == 0
+    evs = events_from(capsys.readouterr().out)
+    assert [e["paused"] for e in evs if e["event"] == "pause"] == [True, False]
+    assert evs[-1]["t"] == pytest.approx(4.0)  # 6 s of wall clock, 2 of them paused
 
 
 def test_headless_fire_deep_and_time_scale_orders(capsys):

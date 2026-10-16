@@ -41,6 +41,7 @@ class Controls:
     zoom_out: bool = False
     time_scale: int | None = None  # one of TIME_SCALES: switch to that compression
     legend: bool = False  # toggle the symbol legend
+    pause: bool = False  # toggle pause
     restart: bool = False
 
 
@@ -61,6 +62,7 @@ class Game:
         self.messages: list[tuple[float, str]] = []
         self.restarts = 0
         self.show_legend = True  # on until the player hides it with L
+        self.paused = False
         self._drain()
 
     # --- orders ----------------------------------------------------------------------------
@@ -94,6 +96,13 @@ class Game:
             self.set_time_scale(controls.time_scale)
         if controls.legend:
             self.show_legend = not self.show_legend
+        if controls.pause:
+            self.toggle_pause()
+
+    def toggle_pause(self) -> None:
+        """Freeze the world (orders still apply; they take effect on resume)."""
+        self.paused = not self.paused
+        events.emit("pause", paused=self.paused, t=round(self.world.time, 2))
 
     def fire(self) -> bool:
         torpedo = self.world.fire()
@@ -110,6 +119,7 @@ class Game:
         self.seed = seed if seed is not None else self.seed + 1
         self.world = hunting_scenario(self.seed)
         self.messages.clear()
+        self.paused = False
         self._since_state = 0.0
         events.emit("restart", seed=self.seed)
         self._drain()
@@ -122,6 +132,8 @@ class Game:
 
     def update(self, dt: float) -> None:
         """Advance the game by ``dt`` real seconds (times the time compression)."""
+        if self.paused:
+            return
         remaining = dt * self.time_scale
         while remaining > 1e-9:
             step = min(MAX_SUBSTEP, remaining)
@@ -177,6 +189,7 @@ class Game:
         data = self.world.snapshot()
         data["seed"] = self.seed
         data["time_scale"] = self.time_scale
+        data["paused"] = self.paused
         data["zoom"] = self.zoom
         sol = self.solution()
         data["solution"] = sol.snapshot() if sol else None

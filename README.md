@@ -32,6 +32,7 @@ The major enemy ship types are merchant and military ships. They offen comes in 
 | F     | fire a torpedo along the heading                         |
 | - / = | zoom out / in                                            |
 | 1-4   | time compression x1 / x2 / x4 / x8                       |
+| P     | pause / resume                                           |
 | L     | show / hide the symbol legend (on at the start)          |
 | R     | new hunt (new seed)                                      |
 

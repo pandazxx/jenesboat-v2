@@ -35,7 +35,8 @@ def build_parser() -> argparse.ArgumentParser:
             "headless: JSON list of timed orders, e.g. "
             '\'[{"t":0,"throttle":1},{"t":5,"rudder":1},{"t":8,"dive":true}]\'. '
             "Keys: throttle (-1..1) or telegraph ('ahead half', ...), rudder (-1..1), "
-            "dive (toggle), deep, target_depth (m), fire, time_scale (1, 2, 4 or 8)."
+            "dive (toggle), deep, target_depth (m), fire, time_scale (1, 2, 4 or 8), "
+            "pause (toggle)."
         ),
     )
     return p
@@ -72,6 +73,8 @@ def run_headless(
                 game.set_time_scale(int(order["time_scale"]))
             if order.get("fire"):
                 game.fire()
+            if order.get("pause"):
+                game.toggle_pause()
             events.emit("order", **order)
         game.update(dt)
         t += dt

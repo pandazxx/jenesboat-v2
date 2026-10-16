@@ -151,3 +151,25 @@ def test_describe_covers_every_player_facing_event():
 
 def test_snapshot_is_json_serialisable():
     json.dumps(Game(seed=1).snapshot())
+
+
+def test_pause_freezes_the_world_but_not_the_view(captured):
+    game = Game(seed=3, state_interval=1.0)
+    game.update(0.5)
+    t = game.world.time
+    game.apply(Controls(pause=True), 0.1)
+    assert game.paused
+    assert events.parse(captured[-1]) == {"event": "pause", "paused": True, "t": 0.5}
+    for _ in range(20):
+        game.apply(Controls(zoom_in=True, throttle_up=True), 0.1)
+        game.update(0.1)
+    assert game.world.time == t  # nothing moved, no state events
+    assert game.state_events == 0
+    assert game.zoom < ZOOM_LEVELS[3] and game.world.player.telegraph_label == "AHEAD FLANK"
+    assert game.snapshot()["paused"] is True
+    game.apply(Controls(pause=True), 0.1)
+    game.update(0.5)
+    assert game.world.time == pytest.approx(t + 0.5)
+    game.apply(Controls(pause=True), 0.1)
+    game.apply(Controls(restart=True), 0.1)
+    assert not game.paused  # a new hunt starts running
