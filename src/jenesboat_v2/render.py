@@ -41,6 +41,7 @@ BUBBLE = (200, 90, 90, 110)
 HUD = (230, 230, 230, 255)
 HUD_DIM = (150, 160, 170, 255)
 ALERT = (255, 120, 90, 255)
+PANEL_BG = (6, 18, 36, 200)
 
 TRACK_LENGTH = 12_000.0  # m of projected track drawn ahead of the target
 HUD_TOP = 104  # px reserved for the HUD text at the top
@@ -101,6 +102,8 @@ def draw(rl, game: Game, width: int, height: int) -> None:
     _draw_fire_control(rl, cam, game)
     _draw_sub(rl, cam, game)
     _draw_hud(rl, game, width, height)
+    if game.show_legend:
+        _draw_legend(rl, width, height)
     rl.end_drawing()
 
 
@@ -321,8 +324,12 @@ def _draw_hud(rl, game: Game, width: int, height: int) -> None:
     for t, text in game.messages:
         rl.draw_text(f"{t / 60:5.1f}m  {text}", 10, y, 16, _color(rl, HUD_DIM))
         y += 18
+    help_line = (
+        "W/S telegraph  A/D rudder  Q amidships  SPACE dive  C deep  F fire  "
+        "-/= zoom  1-4 time  L legend"
+    )
     rl.draw_text(
-        "W/S telegraph  A/D rudder  Q amidships  SPACE dive  C deep  F fire  -/= zoom  1-4 time  R",
+        help_line,
         10,
         height - 26,
         16,
@@ -344,6 +351,61 @@ def _draw_hud(rl, game: Game, width: int, height: int) -> None:
         )
         tw = rl.measure_text(text, 20)
         rl.draw_text(text, (width - tw) // 2, height // 2 - 10, 20, _color(rl, HUD))
+
+
+# (swatch kind, colour, text) rows of the legend; swatch kinds are drawn by _draw_swatch.
+LEGEND = (
+    ("dot", SUB_SURFACED, "you, surfaced (outline: submerged)"),
+    ("ring", BUBBLE, "how far lookouts can see you"),
+    ("dots", OWN_TRACK, "your track"),
+    ("box", HULL_MERCHANT, "ship in sight (grey X: wreck)"),
+    ("box", HULL_SONAR, "ship heard on the hydrophones (estimate)"),
+    ("dash", HYDRO, "hydrophone bearing"),
+    ("dash", TRACK, "target's course, projected"),
+    ("line", AIM, "torpedo track if fired now"),
+    ("ring", LEAD_BAD, "where it crosses the target's course"),
+    ("dot", LEAD_BAD, "target when the torpedo gets there"),
+    ("line", LEAD_BAD, "miss distance: green = fire"),
+    ("dot", TORPEDO, "torpedo running"),
+    ("blur", CUE, "intel / last seen (arrow when off screen)"),
+)
+LEGEND_WIDTH = 345
+LEGEND_ROW = 18
+
+
+def _draw_legend(rl, width: int, height: int) -> None:
+    """Symbol key in the lower right, above the build tag (L toggles it)."""
+    rows = len(LEGEND)
+    panel_h = LEGEND_ROW * (rows + 1) + 10
+    x0 = width - LEGEND_WIDTH - 10
+    y0 = height - 56 - panel_h
+    rl.draw_rectangle(x0, y0, LEGEND_WIDTH, panel_h, _color(rl, PANEL_BG))
+    rl.draw_text("LEGEND  (L to hide)", x0 + 8, y0 + 6, 14, _color(rl, HUD))
+    y = y0 + 6 + LEGEND_ROW
+    for kind, rgba, text in LEGEND:
+        _draw_swatch(rl, kind, x0 + 20, y + 7, rgba)
+        rl.draw_text(text, x0 + 40, y, 14, _color(rl, HUD_DIM))
+        y += LEGEND_ROW
+
+
+def _draw_swatch(rl, kind: str, cx: float, cy: float, rgba) -> None:
+    color = _color(rl, rgba)
+    if kind == "dot":
+        rl.draw_circle_v(rl.Vector2(cx, cy), 4.0, color)
+    elif kind == "ring":
+        rl.draw_circle_lines(int(cx), int(cy), 6.0, color)
+    elif kind == "box":
+        rl.draw_rectangle_pro(rl.Rectangle(cx, cy, 16.0, 6.0), rl.Vector2(8.0, 3.0), 0.0, color)
+    elif kind == "line":
+        rl.draw_line_ex(rl.Vector2(cx - 10, cy), rl.Vector2(cx + 10, cy), 1.5, color)
+    elif kind == "dash":
+        for dx in (-10, -2, 6):
+            rl.draw_line_ex(rl.Vector2(cx + dx, cy), rl.Vector2(cx + dx + 4, cy), 1.0, color)
+    elif kind == "dots":
+        for dx in (-9, -5, -1, 3, 7):
+            rl.draw_pixel(int(cx + dx), int(cy), color)
+    elif kind == "blur":
+        _draw_blur(rl, cx, cy, 8.0, CUE_BLUR)
 
 
 def _draw_contact_panel(rl, game: Game, width: int) -> None:

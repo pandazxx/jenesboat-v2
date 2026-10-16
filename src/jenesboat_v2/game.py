@@ -40,6 +40,7 @@ class Controls:
     zoom_in: bool = False
     zoom_out: bool = False
     time_scale: int | None = None  # one of TIME_SCALES: switch to that compression
+    legend: bool = False  # toggle the symbol legend
     restart: bool = False
 
 
@@ -59,6 +60,7 @@ class Game:
         self.zoom_index = DEFAULT_ZOOM
         self.messages: list[tuple[float, str]] = []
         self.restarts = 0
+        self.show_legend = True  # on until the player hides it with L
         self._drain()
 
     # --- orders ----------------------------------------------------------------------------
@@ -90,6 +92,8 @@ class Game:
             self.zoom_index = min(len(ZOOM_LEVELS) - 1, self.zoom_index + 1)
         if controls.time_scale is not None:
             self.set_time_scale(controls.time_scale)
+        if controls.legend:
+            self.show_legend = not self.show_legend
 
     def fire(self) -> bool:
         torpedo = self.world.fire()

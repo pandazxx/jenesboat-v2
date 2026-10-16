@@ -112,6 +112,7 @@ and summary as the `agent-smoke-<name>` artifact.
 | F     | fire a torpedo along the heading                         |
 | - / = | zoom out / in                                            |
 | 1-4   | time compression x1 / x2 / x4 / x8                       |
+| L     | show / hide the symbol legend (on at the start)          |
 | R     | new hunt (new seed)                                      |
 
 Playwright key names for `--keys`: letters as is, `Space`, `Minus`, `Equal`, `Digit4`.

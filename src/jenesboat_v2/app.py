@@ -32,6 +32,7 @@ def read_controls(rl) -> Controls:
         zoom_in=rl.is_key_pressed(key.KEY_EQUAL),
         zoom_out=rl.is_key_pressed(key.KEY_MINUS),
         time_scale=scale,
+        legend=rl.is_key_pressed(key.KEY_L),
         restart=rl.is_key_pressed(key.KEY_R),
     )
 

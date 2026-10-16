@@ -20,6 +20,7 @@ PYRAY_ARITY = {
     "draw_circle_lines": 4,
     "draw_rectangle_pro": 4,
     "draw_rectangle_lines": 5,
+    "draw_rectangle": 5,
     "draw_text": 5,
 }
 
@@ -52,7 +53,10 @@ class FakeRL:
         raise AttributeError(f"{name}: not in the allowed pyray call table")
 
 
-def draw(game: Game) -> list[str]:
+def draw(game: Game, legend: bool = False) -> list[str]:
+    """Render once and return the pyray calls; the legend is off unless asked for, so tests
+    can count map symbols."""
+    game.show_legend = legend
     rl = FakeRL()
     render.draw(rl, game, 960, 540)
     assert rl.calls[0] == "begin_drawing" and rl.calls[-1] == "end_drawing"
@@ -136,3 +140,17 @@ def test_draws_sonar_ghosts_and_the_sonar_target_panel():
     assert game.target().method == "hydrophone"
     calls = draw(game)
     assert calls.count("draw_rectangle_pro") == 3  # ghost hulls at the estimated positions
+
+
+def test_legend_is_on_by_default_and_l_toggles_it():
+    game = Game(seed=1, state_interval=float("inf"))
+    assert game.show_legend
+    with_legend = draw(game, legend=True)
+    assert "draw_rectangle" in with_legend  # the legend background
+    game.apply(Controls(legend=True), 0.1)
+    assert not game.show_legend
+    without = draw(game, legend=game.show_legend)
+    assert "draw_rectangle" not in without
+    assert with_legend.count("draw_text") > without.count("draw_text")
+    game.apply(Controls(legend=True), 0.1)
+    assert game.show_legend
