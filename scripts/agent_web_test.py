@@ -2,7 +2,7 @@
 """Drive a web build in headless Chromium the way an LLM agent would.
 
     uv run python scripts/agent_web_test.py https://pandazxx.github.io/jenesboat-v2/builds/abc1234/
-    uv run python scripts/agent_web_test.py http://127.0.0.1:9000/ --keys W:3,D:2 --screenshot s.png
+    uv run python scripts/agent_web_test.py http://127.0.0.1:9000/ --keys W:0.3,D:2
 
 Loads the page, waits for the game's ``JENESBOAT {"event":"ready"}`` console line, presses
 keys, collects ``state`` events, takes a screenshot and prints a JSON summary.  Exit code is
@@ -45,12 +45,22 @@ def parse_keys(spec: str) -> list[tuple[str, float]]:
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("url")
-    p.add_argument("--keys", default="W:3,D:2", help="key:seconds sequence, '' for none")
+    p.add_argument(
+        "--keys",
+        default="W:0.3,W:0.3,W:0.3,W:0.3,D:2",
+        help="key:seconds sequence ('' for none); W steps the telegraph once per press",
+    )
     p.add_argument("--settle", type=float, default=2.0, help="seconds to observe after keys")
     p.add_argument("--ready-timeout", type=float, default=240.0)
     p.add_argument("--screenshot", default="dist/agent/web.png")
     p.add_argument("--out", default="dist/agent/web.json", help="where to write the summary")
     p.add_argument("--headed", action="store_true")
+    p.add_argument(
+        "--dpr",
+        type=float,
+        default=1.0,
+        help="device pixel ratio to emulate (2 reproduces a HiDPI laptop screen)",
+    )
     args = p.parse_args()
     if args.url.startswith("http://localhost:8"):
         print(
@@ -77,10 +87,12 @@ def main() -> int:
     def has(event: str) -> bool:
         return any(e["event"] == event for e in events)
 
-    summary: dict = {"url": args.url, "ok": False}
+    summary: dict = {"url": args.url, "ok": False, "dpr": args.dpr}
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=not args.headed, args=["--use-gl=swiftshader"])
-        page = browser.new_page(viewport={"width": 1024, "height": 640})
+        page = browser.new_page(
+            viewport={"width": 1024, "height": 640}, device_scale_factor=args.dpr
+        )
         page.on("console", on_console)
         page.on("pageerror", lambda err: errors.append(str(err)))
         t0 = time.time()

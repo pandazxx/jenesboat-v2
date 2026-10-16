@@ -55,7 +55,7 @@ def uy(*argv):
 async def custom_site():
     import embed
 
-    platform.document.body.style.background = "#7f7f7f"
+    platform.document.body.style.background = "#061224"
 
     platform.window.transfer.hidden = true
     platform.window.canvas.style.visibility = "visible"
@@ -184,7 +184,7 @@ asyncio.run( custom_site() )
 config = {
     xtermjs : "{{cookiecutter.xtermjs}}" ,
     _sdl2 : "canvas",
-    user_canvas : 0,
+    user_canvas : 1,
     user_canvas_managed : 0,
     ume_block : {{cookiecutter.ume_block}},
     can_close : {{cookiecutter.can_close}},
@@ -227,30 +227,36 @@ config = {
         div.emscripten_border { border: 1px solid black; }
         div.thick_border { border: 4px solid black; }
 
-        /* the canvas *must not* have any border or padding, or mouse coords will be wrong */
-        /* average size of droid screen 470dp x 320dp  */
+        /* jenesboat: the game owns the canvas layout (config.user_canvas = 1).  The canvas is
+           centred in the viewport and scaled to the largest 16:9 box that fits; !important
+           beats the inline styles the pygbag runtime and SDL may set.  The game is keyboard
+           only, so CSS scaling does not upset any mouse coordinates. */
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
+
         canvas.emscripten {
             border: 0px none;
             background-color: transparent;
-            width: 100%;
-            height: 100%;
             z-index: 5;
-
-            padding: 0;
-            margin: 0 auto;
-
-            position: absolute;
-            top: 0;
-            bottom: 0;
-            left: 0;
-            right: 0;
+            padding: 0 !important;
+            margin: 0 !important;
+            position: fixed !important;
+            left: 50% !important;
+            top: 50% !important;
+            right: auto !important;
+            bottom: auto !important;
+            transform: translate(-50%, -50%);
+            width: min(100vw, calc(100vh * 16 / 9)) !important;
+            height: min(100vh, calc(100vw * 9 / 16)) !important;
         }
 
         body {
             font-family: arial;
             margin: 0;
             padding: none;
-            background-color:powderblue;
+            background-color: #061224;
         }
 
         .topright{

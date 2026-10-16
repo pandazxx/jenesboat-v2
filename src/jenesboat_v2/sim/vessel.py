@@ -5,30 +5,20 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-KNOT = 0.514444  # metres per second
+from jenesboat_v2.sim.geo import angle_diff, clamp, wrap_degrees
+from jenesboat_v2.sim.params import KNOT, RUDDER_MAX_ANGLE, TELEGRAPH, VesselParams
+
+__all__ = ["KNOT", "Vessel", "VesselParams", "angle_diff", "clamp", "wrap_degrees"]
 
 
-def clamp(value: float, lo: float, hi: float) -> float:
-    return lo if value < lo else hi if value > hi else value
+def telegraph_index(throttle: float) -> int:
+    """The telegraph position nearest to a throttle fraction."""
+    return min(range(len(TELEGRAPH)), key=lambda i: abs(TELEGRAPH[i][1] - throttle))
 
 
-def wrap_degrees(deg: float) -> float:
-    return deg % 360.0
-
-
-def angle_diff(target: float, current: float) -> float:
-    """Signed shortest turn from ``current`` to ``target`` in degrees (-180, 180]."""
-    return (target - current + 180.0) % 360.0 - 180.0
-
-
-@dataclass(frozen=True)
-class VesselParams:
-    max_speed: float  # m/s, full ahead
-    acceleration: float = 0.3  # m/s^2 toward the ordered speed
-    turn_rate: float = 6.0  # deg/s at full rudder with steerage way
-    reverse_fraction: float = 0.5  # max astern speed as fraction of max_speed
-    length: float = 60.0  # metres (drawing only)
-    beam: float = 8.0  # metres (drawing only)
+def telegraph_by_name(name: str) -> int | None:
+    name = name.strip().upper()
+    return next((i for i, (label, _) in enumerate(TELEGRAPH) if label == name), None)
 
 
 @dataclass
@@ -49,6 +39,36 @@ class Vessel:
     def set_rudder(self, value: float) -> None:
         self.rudder = clamp(value, -1.0, 1.0)
 
+    # --- the bridge view of the orders ---------------------------------------------------
+
+    @property
+    def telegraph(self) -> int:
+        return telegraph_index(self.throttle)
+
+    @property
+    def telegraph_label(self) -> str:
+        return TELEGRAPH[self.telegraph][0]
+
+    def set_telegraph(self, index: int) -> None:
+        index = max(0, min(len(TELEGRAPH) - 1, index))
+        self.set_throttle(TELEGRAPH[index][1])
+
+    def telegraph_step(self, delta: int) -> None:
+        """One telegraph position ahead (+1) or astern (-1)."""
+        self.set_telegraph(self.telegraph + delta)
+
+    @property
+    def rudder_angle(self) -> float:
+        """Degrees, positive to starboard."""
+        return self.rudder * RUDDER_MAX_ANGLE
+
+    @property
+    def rudder_label(self) -> str:
+        angle = self.rudder_angle
+        if abs(angle) < 0.5:
+            return "RUDDER AMIDSHIPS"
+        return f"RUDDER {abs(angle):2.0f} {'STBD' if angle > 0 else 'PORT'}"
+
     def max_speed_now(self) -> float:
         """Current speed ceiling; subclasses may reduce it (e.g. when submerged)."""
         return self.params.max_speed
@@ -63,6 +83,12 @@ class Vessel:
     def speed_knots(self) -> float:
         return self.speed / KNOT
 
+    def turn_rate_now(self) -> float:
+        """deg/s at the current rudder and speed.  A ship turns on a roughly constant radius,
+        so the rate grows with speed; going astern the rudder works the other way."""
+        rate = math.degrees(self.rudder * self.speed / self.params.turn_radius)
+        return clamp(rate, -self.params.max_turn_rate, self.params.max_turn_rate)
+
     def step(self, dt: float) -> None:
         target = self.target_speed()
         delta = self.params.acceleration * dt
@@ -73,17 +99,22 @@ class Vessel:
         else:
             self.speed -= delta
 
-        # The rudder only bites with water flowing over it.
-        steerage = max(self.params.max_speed * 0.3, 1e-9)
-        flow = min(1.0, abs(self.speed) / steerage)
-        direction = 1.0 if self.speed >= 0 else -1.0
-        self.heading = wrap_degrees(
-            self.heading + self.rudder * self.params.turn_rate * flow * direction * dt
-        )
+        self.heading = wrap_degrees(self.heading + self.turn_rate_now() * dt)
 
         rad = math.radians(self.heading)
         self.x += math.sin(rad) * self.speed * dt
         self.y += math.cos(rad) * self.speed * dt
+
+    def contains(self, px: float, py: float, margin: float = 0.0) -> bool:
+        """Is the point inside the hull box (length along heading, beam across)?"""
+        rad = math.radians(self.heading)
+        dx, dy = px - self.x, py - self.y
+        along = dx * math.sin(rad) + dy * math.cos(rad)
+        across = dx * math.cos(rad) - dy * math.sin(rad)
+        return (
+            abs(along) <= self.params.length / 2 + margin
+            and abs(across) <= self.params.beam / 2 + margin
+        )
 
     def snapshot(self) -> dict[str, float]:
         return {
@@ -92,5 +123,6 @@ class Vessel:
             "heading": round(self.heading, 1),
             "speed_kn": round(self.speed_knots, 2),
             "throttle": round(self.throttle, 2),
+            "telegraph": self.telegraph_label,
             "rudder": round(self.rudder, 2),
         }
