@@ -8,6 +8,7 @@ import pytest
 
 from jenesboat_v2 import events
 from jenesboat_v2.game import Game
+from jenesboat_v2.sim import hunting_scenario
 from jenesboat_v2.sim.geo import angle_diff, bearing, distance, project, ray_line_crossing
 from jenesboat_v2.sim.params import TYPE_VIIC
 
@@ -19,12 +20,12 @@ def steer_toward(sub, x, y) -> None:
     sub.set_rudder(max(-1.0, min(1.0, angle_diff(bearing(sub.x, sub.y, x, y), sub.heading) / 10)))
 
 
-def play(seed: int, max_minutes: float = 150.0) -> list[dict]:
+def play(seed: int, max_minutes: float = 150.0, escorts: int = 0) -> list[dict]:
     log: list[dict] = []
     events.set_sink(lambda line: log.append(events.parse(line)))
     try:
-        game = Game(seed=seed, state_interval=float("inf"))
-        world = game.world
+        world = hunting_scenario(seed, escorts=escorts)
+        game = Game(world=world, seed=seed, state_interval=float("inf"))
         sub = world.player
         # The skipper reads the intel and plots the group's track from the middle ship.
         lead = world.ships[1]
@@ -82,11 +83,22 @@ def test_scripted_ambush_scores_a_hit(seed):
     assert first_alert is None or first_alert["reason"] == "torpedo"
 
 
+def test_escorted_hunt_is_harder_but_a_hit_is_still_normal():
+    """Acceptance: "more challenging game play but still achievable".  The same scripted
+    skipper, who ignores the destroyers, still lands a hit on most seeds and is never lost."""
+    hits = 0
+    for seed in range(8):
+        log = play(seed, escorts=2)
+        hits += any(e["event"] == "hit" for e in log)
+        assert not any(e["event"] == "mission_end" and e["status"] == "boat_lost" for e in log)
+    assert 4 <= hits  # unescorted it is 8 of 8; the escort costs some, not most
+
+
 def test_a_surfaced_approach_is_spotted_and_the_group_runs():
     log: list[dict] = []
     events.set_sink(lambda line: log.append(events.parse(line)))
     try:
-        game = Game(seed=1, state_interval=float("inf"))
+        game = Game(world=hunting_scenario(1, escorts=0), seed=1, state_interval=float("inf"))
         sub = game.world.player
         target = game.world.ships[1]
         while game.world.time < 3 * 3600:

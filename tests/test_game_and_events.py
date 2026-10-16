@@ -149,6 +149,17 @@ def test_describe_covers_every_player_facing_event():
         "mission over (all merchants sunk): 1 sunk (4,500 GRT), 0 got away"
     )
     assert describe("state", {}) is None
+    assert describe("escort_alarm", {"by": "destroyer-1", "reason": "sonar"}) == (
+        "ESCORT: destroyer-1 pinged us"
+    )
+    assert "hunting" in describe("escort_split", {"hunters": ["d1"], "screens": ["d2"]})
+    assert "back to formation" in describe("escort_stand_down", {})
+    assert "depth charge run" in describe("depth_charge_run", {"ship": "d1", "charges": 20})
+    assert describe("depth_charge", {"damage": 0.0}) is None
+    assert describe("depth_charge", {"damage": 0.2}) == "DEPTH CHARGE close!"
+    assert describe("damage", {"level": 0.37, "destroyed": False}) == "hull damage 37%"
+    bonus = describe("sunk", {"ship": "d", "kind": "military", "tonnage": 1800})
+    assert bonus == "d SUNK: escort bonus 1,800 GRT"
 
 
 def test_snapshot_is_json_serialisable():

@@ -255,9 +255,27 @@ def describe(name: str, data: dict) -> str | None:
     if name == "hit":
         return f"HIT {data['ship']}"
     if name == "sunk":
+        if data.get("kind") == "military":
+            return f"{data['ship']} SUNK: escort bonus {data['tonnage']:,} GRT"
         return f"{data['ship']} SUNK, {data['tonnage']:,} GRT"
     if name == "torpedo_lost":
         return f"torpedo {data['torpedo']} missed"
+    if name == "escort_alarm":
+        how = {"sonar": "pinged us", "sighted": "sighted us", "torpedo": "was torpedoed"}
+        return f"ESCORT: {data['by']} {how.get(data['reason'], data['reason'])}"
+    if name == "escort_split":
+        return (
+            f"escort splits: {', '.join(data['hunters'])} hunting, "
+            f"{', '.join(data['screens']) or 'none'} screening"
+        )
+    if name == "escort_stand_down":
+        return "escort lost the track, back to formation"
+    if name == "depth_charge_run":
+        return f"{data['ship']} is making a depth charge run"
+    if name == "depth_charge" and data["damage"] > 0:
+        return "DEPTH CHARGE close!"
+    if name == "damage":
+        return f"hull damage {data['level'] * 100:.0f}%"
     if name == "escaped":
         return f"{data['ship']} got away"
     if name == "mission_end":
@@ -273,6 +291,6 @@ def objective(world: World) -> str:
     n = len(world.merchants)
     km = MERCHANT_AI.escape_range / 1000
     return (
-        f"Objective: sink the {n} merchants. The hunt ends when all are sunk or "
-        f"more than {km:.0f} km away, or your torpedoes are gone"
+        f"Objective: sink the {n} merchants (a destroyer is a bonus). The hunt ends when all "
+        f"are sunk or more than {km:.0f} km away, your torpedoes are gone, or the boat is lost"
     )

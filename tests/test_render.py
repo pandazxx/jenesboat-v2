@@ -168,3 +168,16 @@ def test_every_contact_gets_a_projected_course_and_the_target_a_ring():
     calls = draw(game)
     assert calls.count("draw_rectangle_pro") == 3
     assert calls.count("draw_circle_lines") >= 2  # target ring + lookout circle
+
+
+def test_draws_escort_depth_charges_damage_and_the_destroyer_legend():
+    from jenesboat_v2.sim.weapons import DepthCharge
+
+    game = Game(seed=3, state_interval=float("inf"))
+    sub = game.world.player
+    game.world.depth_charges.append(DepthCharge(1, sub.x + 200.0, sub.y, 40.0))
+    sub.damage = 0.4
+    game.world.bonus = 1_800
+    plain = draw(game)
+    assert plain.count("draw_circle_v") >= 2  # the boat and the sinking charge
+    assert len(draw(game, legend=True)) > len(plain)

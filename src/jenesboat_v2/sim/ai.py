@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from jenesboat_v2.sim.geo import angle_diff, bearing, clamp, wrap_degrees
-from jenesboat_v2.sim.params import MERCHANT_AI, MerchantAIParams
+from jenesboat_v2.sim.geo import angle_diff, bearing, clamp, distance, wrap_degrees
+from jenesboat_v2.sim.params import ESCORT_AI, MERCHANT_AI, MerchantAIParams
 
 if TYPE_CHECKING:
     from jenesboat_v2.sim.world import Ship
@@ -32,7 +32,17 @@ def flee_heading(ship: Ship, t: float, params: MerchantAIParams = MERCHANT_AI) -
 
 
 def flee(ship: Ship, t: float, params: MerchantAIParams = MERCHANT_AI) -> None:
-    """Full speed away from the threat, zigzagging, spread out from the neighbours."""
+    """Full speed away from the threat, zigzagging, spread out from the neighbours.  With an
+    escort to shelter behind, run for the spot behind it instead, and hold the far side of it
+    once there."""
+    if ship.shelter is not None:
+        sx, sy = ship.shelter
+        if distance(ship.x, ship.y, sx, sy) > ESCORT_AI.shelter_radius:
+            steer(ship, bearing(ship.x, ship.y, sx, sy) + ship.spread * params.spread_angle / 2)
+        else:
+            steer(ship, bearing(ship.threat_x, ship.threat_y, ship.x, ship.y))
+        ship.set_throttle(1.0)
+        return
     steer(ship, flee_heading(ship, t, params))
     ship.set_throttle(1.0)
 
