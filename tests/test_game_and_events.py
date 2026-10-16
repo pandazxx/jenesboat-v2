@@ -103,14 +103,15 @@ def test_time_compression_substeps_the_world(captured):
 def test_restart_makes_a_new_hunt(captured):
     game = Game(seed=5, state_interval=float("inf"))
     first = game.world
-    assert game.messages[0][1].startswith("BdU:")
+    assert game.messages[0][1].startswith("Objective: sink the 3 merchants")
+    assert game.messages[1][1].startswith("BdU:")
     game.apply(Controls(fire=True), 0.1)
     game.apply(Controls(restart=True), 0.1)
     assert game.world is not first
     assert game.seed == 6 and game.restarts == 1
     assert game.world.player.tubes.loaded == 4
     assert [events.parse(line)["event"] for line in captured].count("restart") == 1
-    assert game.messages[-1][1].startswith("BdU:")
+    assert [m[1][:9] for m in game.messages] == ["Objective", "BdU: 3 me"]
 
 
 def test_target_and_solution_follow_the_nearest_visual_contact(captured):
@@ -143,8 +144,9 @@ def test_describe_covers_every_player_facing_event():
         == "a, b running: we were sighted"
     )
     assert describe("sunk", {"ship": "t", "tonnage": 9000, "total": 9000}) == "t SUNK, 9,000 GRT"
-    assert describe("mission_end", {"sunk": ["a"], "escaped": [], "tonnage": 4500}).startswith(
-        "mission over"
+    end = {"sunk": ["a"], "escaped": [], "tonnage": 4500, "reason": "all merchants sunk"}
+    assert describe("mission_end", end) == (
+        "mission over (all merchants sunk): 1 sunk (4,500 GRT), 0 got away"
     )
     assert describe("state", {}) is None
 

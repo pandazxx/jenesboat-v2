@@ -46,7 +46,8 @@ async def run(max_seconds: float | None = None, seed: int | None = None) -> None
     rl.set_trace_log_level(rl.TraceLogLevel.LOG_WARNING)
     rl.init_window(WIDTH, HEIGHT, f"jenesboat {BUILD_ID}")
     if system == "Emscripten":
-        platform.window.window_resize()  # sync the canvas CSS size with the GL canvas
+        # The page CSS (web/noctx.tmpl) centres and scales the canvas; this only focuses it.
+        platform.window.window_resize()
     rl.set_target_fps(60)
 
     events.emit("ready", build=BUILD_ID, sha=GIT_SHA, platform=system, width=WIDTH, height=HEIGHT)

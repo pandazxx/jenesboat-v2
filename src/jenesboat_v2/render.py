@@ -299,7 +299,10 @@ def _draw_hud(rl, game: Game, width: int, height: int) -> None:
         f"HDG {sub.heading:05.1f}   SPD {sub.speed_knots:5.1f} kn   "
         f"{sub.telegraph_label}   {sub.rudder_label}"
     )
-    line1b = f"POS {sub.x / 1000:.2f}E {sub.y / 1000:.2f}N   LOG {world.player_log / 1852:.2f} nm"
+    line1b = (
+        f"POS {sub.x / 1000:.2f}E {sub.y / 1000:.2f}N   LOG {world.player_log / 1852:.2f} nm   "
+        f"SUNK {world.tonnage:,} GRT"
+    )
     line2 = (
         f"DEPTH {sub.depth:5.1f} m -> {sub.target_depth:5.1f} m   {sub.depth_band.upper()}"
         f"   BATT {sub.battery * 100:3.0f}%"
@@ -309,9 +312,11 @@ def _draw_hud(rl, game: Game, width: int, height: int) -> None:
         if tubes.reloading
         else ""
     )
+    mission = world.mission()
     line3 = (
         f"TUBES {tubes.loaded}/{tubes.params.tubes}  RES {tubes.reserves}{reload}   "
-        f"TIME {'PAUSED' if game.paused else f'x{game.time_scale}'}   SUNK {world.tonnage:,} GRT"
+        f"TIME {'PAUSED' if game.paused else f'x{game.time_scale}'}   "
+        f"HUNT {len(mission['sunk'])}/{mission['total']} sunk, {len(mission['escaped'])} away"
     )
     rl.draw_text(line1, 10, 10, 20, _color(rl, HUD))
     rl.draw_text(line2, 10, 34, 20, _color(rl, HUD))
@@ -347,11 +352,10 @@ def _draw_hud(rl, game: Game, width: int, height: int) -> None:
         text = "PAUSED  -  P to resume"
         tw = rl.measure_text(text, 24)
         rl.draw_text(text, (width - tw) // 2, height // 2 - 40, 24, _color(rl, HUD))
-    mission = world.mission()
     if mission["status"] != "active":
         text = (
-            f"MISSION OVER: {len(mission['sunk'])} sunk, {mission['tonnage']:,} GRT, "
-            f"{len(mission['escaped'])} escaped   -   R for a new hunt"
+            f"HUNT OVER ({mission['reason']}): {len(mission['sunk'])} sunk, "
+            f"{mission['tonnage']:,} GRT, {len(mission['escaped'])} got away   -   R for a new hunt"
         )
         tw = rl.measure_text(text, 20)
         rl.draw_text(text, (width - tw) // 2, height // 2 - 10, 20, _color(rl, HUD))

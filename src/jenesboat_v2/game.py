@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from jenesboat_v2 import events
 from jenesboat_v2.sim import World, hunting_scenario
 from jenesboat_v2.sim.detection import VISUAL, Contact
-from jenesboat_v2.sim.params import RUDDER_RATE
+from jenesboat_v2.sim.params import MERCHANT_AI, RUDDER_RATE
 from jenesboat_v2.sim.weapons import Solution, solution
 
 TIME_SCALES = (1, 2, 4, 8)
@@ -63,6 +63,7 @@ class Game:
         self.restarts = 0
         self.show_legend = True  # on until the player hides it with L
         self.paused = False
+        self.messages.append((0.0, objective(self.world)))
         self._drain()
 
     # --- orders ----------------------------------------------------------------------------
@@ -122,6 +123,7 @@ class Game:
         self.paused = False
         self._since_state = 0.0
         events.emit("restart", seed=self.seed)
+        self.messages.append((0.0, objective(self.world)))
         self._drain()
 
     # --- time ------------------------------------------------------------------------------
@@ -231,7 +233,17 @@ def describe(name: str, data: dict) -> str | None:
         return f"{data['ship']} got away"
     if name == "mission_end":
         return (
-            f"mission over: {len(data['sunk'])} sunk ({data['tonnage']:,} GRT), "
-            f"{len(data['escaped'])} escaped"
+            f"mission over ({data['reason']}): {len(data['sunk'])} sunk "
+            f"({data['tonnage']:,} GRT), {len(data['escaped'])} got away"
         )
     return None
+
+
+def objective(world: World) -> str:
+    """The rule of the hunt, told once at the start."""
+    n = len(world.merchants)
+    km = MERCHANT_AI.escape_range / 1000
+    return (
+        f"Objective: sink the {n} merchants. The hunt ends when all are sunk or "
+        f"more than {km:.0f} km away, or your torpedoes are gone"
+    )

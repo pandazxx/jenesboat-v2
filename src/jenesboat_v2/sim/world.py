@@ -136,12 +136,17 @@ class World:
         remaining = [s.ship_id for s in merchants if s.active]
         if not remaining:
             status = "complete"
+            reason = "all merchants sunk" if not escaped else "no merchants left in range"
         elif self.torpedoes_left == 0:
             status = "out_of_torpedoes"
+            reason = "no torpedoes left"
         else:
             status = "active"
+            reason = ""
         return {
             "status": status,
+            "reason": reason,
+            "total": len(merchants),
             "sunk": sunk,
             "escaped": escaped,
             "remaining": remaining,
@@ -314,11 +319,11 @@ class World:
             self.emit("alert", reason=reason, by=by, ships=newly)
 
     def _check_escaped(self, ship: Ship) -> None:
+        """A merchant has got away once it is beyond the escape range from the boat (the hunt
+        area) or off the map, whether or not it ever saw the boat."""
         out = not (0.0 <= ship.x <= self.width and 0.0 <= ship.y <= self.height)
-        far = ship.alerted(self.time) and (
-            distance(ship.x, ship.y, self.player.x, self.player.y) > MERCHANT_AI.escape_range
-        )
-        if out or far:
+        far = distance(ship.x, ship.y, self.player.x, self.player.y) > MERCHANT_AI.escape_range
+        if ship.kind == "merchant" and (out or far):
             ship.escaped = True
             self.emit("escaped", ship=ship.ship_id)
 

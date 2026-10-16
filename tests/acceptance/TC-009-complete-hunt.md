@@ -25,9 +25,12 @@ Fresh hunt (`R`), x8 time (`4`), zoomed out (`-` twice).
   unseen, and at least one torpedo hits if fired on a green `FIRE` solution.
 - After the first hit the survivors run and zigzag away; a submerged boat cannot catch them,
   a surfaced one is sighted at 6 km and they keep running.
-- When every merchant is sunk or has got away (or the torpedoes are gone) the banner
-  `MISSION OVER: N sunk, N GRT, N escaped - R for a new hunt` appears and `R` starts a new,
-  different hunt (the seed at the bottom right changes).
+- The first message of the hunt states the objective; HUD line 3 keeps the score as
+  `HUNT n/3 sunk, n away`.
+- When every merchant is sunk or has got away (more than 20 km from the boat or off the map,
+  whether or not it ever saw you), or the torpedoes are gone, the banner
+  `HUNT OVER (<reason>): N sunk, N GRT, N got away - R for a new hunt` appears and `R` starts
+  a new, different hunt (the seed at the bottom right changes).
 - Challenge check (acceptance criterion): with the approach above a hit is normal; being seen
   during the approach means losing the group.
 

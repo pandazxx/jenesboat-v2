@@ -94,5 +94,6 @@ just build-web   # pygbag bundle in dist/web
 ```
 
 Milestones: M0 bootstrap (#2), M1 merchant hunting (#9): spot a merchant group far away,
-predict its route, ambush it submerged and torpedo it before it sees you and runs. Every number
+predict its route, ambush it submerged and torpedo it before it sees you and runs. The hunt
+ends when every merchant is sunk or more than 20 km away, or your torpedoes are gone. Every number
 the balance depends on is in `docs/PARAMETERS.md`.

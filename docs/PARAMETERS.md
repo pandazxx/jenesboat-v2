@@ -83,5 +83,5 @@ night is a later milestone). A ship reacts only after the boat has stayed in ran
 | alert duration | 600 s | keeps running this long after the last sighting, then returns to the route |
 | zigzag | ±30° every 90 s | while running |
 | spread | 20° between neighbours | a group fans out instead of running in a line |
-| escape range | 20 km | an alerted merchant this far from the boat has got away |
+| escape range | 20 km | a merchant this far from the boat (or off the map) has got away, alerted or not: the hunt area |
 | panic range | 6 km | a torpedo hit alerts every merchant within this distance |

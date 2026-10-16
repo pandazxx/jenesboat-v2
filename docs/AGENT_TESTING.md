@@ -54,7 +54,9 @@ A `state`/`final` payload looks like:
 hydrophone contacts are the operator's estimate of position, course and speed with an empty
 `type` and never yield a firing solution. `ships` is ground truth for checking. `solution` is the
 fire-control helper for the nearest visual contact: `error` near 0 means a torpedo fired now
-along the heading meets the target. `cue` is where to look when nothing is in sight: the intel
+along the heading meets the target. `mission.status` is `active`, `complete` (every merchant sunk or got away: more than 20 km
+from the boat or off the map) or `out_of_torpedoes`; `mission.reason` says which.
+`cue` is where to look when nothing is in sight: the intel
 report, or the dead-reckoned position of the ship fixed last (`kind` = `last_seen`); `null`
 while any ship is held visually or on the hydrophones. `tests/test_hunt.py` shows a scripted skipper that uses
 exactly these to ambush the group; it is the template for an agent playing a build.

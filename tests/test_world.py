@@ -132,12 +132,15 @@ def test_alert_group_spreads_the_whole_group():
     assert len(headings) == 3  # spread biases send them different ways
 
 
-def test_alerted_merchant_far_away_escapes():
+def test_merchant_beyond_escape_range_has_got_away_even_if_never_alerted():
     world = one_merchant(sub_x=9_000.0, ship_x=-9_000.0, course=270.0)  # 18 km apart
+    world.player.depth = world.player.target_depth = TYPE_VIIC.deep_depth  # never seen
     ship = world.ship("merchant-1")
-    ship.alert(0.0, world.player.x, world.player.y, 1e9)
-    run(world, 600, dt=0.5)  # runs west over the edge of the map
+    run(world, 600, dt=0.5)  # steams west past 20 km from the boat
+    assert not ship.alerted(world.time)
     assert ship.escaped and not ship.active
+    assert world.mission()["status"] == "complete"
+    assert world.mission()["reason"] == "no merchants left in range"
     assert drain(world, "escaped") == [
         {"event": "escaped", "t": world.events[-1]["t"], "ship": "merchant-1"}
     ]
@@ -223,3 +226,16 @@ def test_boat_leaves_a_track():
     assert world.snapshot()["log_nm"] == pytest.approx(world.player_log / 1852.0, abs=1e-3)
     assert all(distance(*a, *b) >= 49.0 for a, b in zip(track, track[1:], strict=False))
     assert distance(*track[-1], world.player.x, world.player.y) < 60.0
+
+
+def test_mission_reasons():
+    world = default_world()
+    m = world.mission()
+    assert m["status"] == "active" and m["reason"] == "" and m["total"] == 3
+    for ship in world.ships:
+        ship.sunk = True
+    assert world.mission()["reason"] == "all merchants sunk"
+    world = default_world()
+    world.player.tubes.loaded = world.player.tubes.reserves = 0
+    assert world.mission()["status"] == "out_of_torpedoes"
+    assert world.mission()["reason"] == "no torpedoes left"
