@@ -36,6 +36,8 @@ def read_controls(rl) -> Controls:
         legend=rl.is_key_pressed(key.KEY_L),
         pause=rl.is_key_pressed(key.KEY_P),
         restart=rl.is_key_pressed(key.KEY_R),
+        confirm=rl.is_key_pressed(key.KEY_Y),
+        cancel=rl.is_key_pressed(key.KEY_N),
     )
 
 

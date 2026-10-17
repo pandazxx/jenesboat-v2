@@ -362,7 +362,14 @@ def _draw_hud(rl, game: Game, width: int, height: int) -> None:
     tw = rl.measure_text(tag, 16)
     rl.draw_text(tag, width - tw - 10, height - 48, 16, _color(rl, HUD_DIM))
 
-    if game.paused:
+    if game.confirming_restart:
+        text = "Abandon this hunt and start a new one?   Y / R: yes    N: no"
+        tw = rl.measure_text(text, 24)
+        rl.draw_rectangle(
+            (width - tw) // 2 - 12, height // 2 - 52, tw + 24, 40, _color(rl, PANEL_BG)
+        )
+        rl.draw_text(text, (width - tw) // 2, height // 2 - 44, 24, _color(rl, ALERT))
+    elif game.paused:
         text = "PAUSED  -  P to resume"
         tw = rl.measure_text(text, 24)
         rl.draw_text(text, (width - tw) // 2, height // 2 - 40, 24, _color(rl, HUD))

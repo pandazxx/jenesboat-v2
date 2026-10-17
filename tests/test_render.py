@@ -181,3 +181,10 @@ def test_draws_escort_depth_charges_damage_and_the_destroyer_legend():
     plain = draw(game)
     assert plain.count("draw_circle_v") >= 2  # the boat and the sinking charge
     assert len(draw(game, legend=True)) > len(plain)
+
+
+def test_restart_prompt_is_drawn():
+    game = Game(seed=1, state_interval=float("inf"))
+    base = draw(game)
+    game.apply(Controls(restart=True), 0.1)
+    assert len(draw(game)) > len(base) - 1 and "draw_rectangle" in draw(game)
