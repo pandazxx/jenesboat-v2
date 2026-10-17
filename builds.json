@@ -1,5 +1,18 @@
 [
   {
+    "built_at": "2026-10-17T12:17:38+00:00",
+    "cdn": "https://pygame-web.github.io/archives/0.9/",
+    "kind": "pr",
+    "name": "5498bb7",
+    "pr": 18,
+    "pybuild": "3.12",
+    "ref": "topic/17-escort",
+    "run_url": "https://github.com/pandazxx/jenesboat-v2/actions/runs/39031900476",
+    "sha": "5498bb7299d1ef4ff0d23a2f9346977c03070bc3",
+    "title": "M2: destroyer escort (sonar, depth charges, hunter/screen AI)",
+    "url": "builds/5498bb7/"
+  },
+  {
     "built_at": "2026-10-16T15:49:59+00:00",
     "cdn": "https://pygame-web.github.io/archives/0.9/",
     "kind": "pr",
