@@ -87,8 +87,10 @@ def test_torpedo_hits_and_sinks_a_freighter_and_scares_the_group():
         "event": "sunk",
         "t": events(world, "sunk")[0]["t"],
         "ship": "target",
+        "kind": "merchant",
         "tonnage": FREIGHTER.tonnage,
         "total": FREIGHTER.tonnage,
+        "bonus": 0,
     }
     assert world.tonnage == FREIGHTER.tonnage
     assert world.torpedoes == []

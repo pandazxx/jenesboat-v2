@@ -34,6 +34,7 @@ WAKE = (90, 130, 170, 255)
 TRACK = (120, 150, 190, 255)
 TRACK_DIM = (70, 90, 120, 255)  # projected course of a contact that is not the target
 HYDRO = (120, 200, 160, 255)
+DEPTH_CHARGE = (255, 170, 60, 255)
 TORPEDO = (255, 255, 255, 255)
 AIM = (200, 180, 90, 160)
 LEAD_OK = (120, 240, 120, 255)
@@ -106,6 +107,9 @@ def draw(rl, game: Game, width: int, height: int) -> None:
 
     for torp in world.torpedoes:
         _draw_torpedo(rl, cam, torp)
+    for charge in world.depth_charges:
+        cx, cy = cam.to_screen(charge.x, charge.y)
+        rl.draw_circle_v(rl.Vector2(cx, cy), 3.0, _color(rl, DEPTH_CHARGE))
 
     _draw_fire_control(rl, cam, game)
     _draw_sub(rl, cam, game)
@@ -310,6 +314,8 @@ def _draw_hud(rl, game: Game, width: int, height: int) -> None:
     line1b = (
         f"POS {sub.x / 1000:.2f}E {sub.y / 1000:.2f}N   LOG {world.player_log / 1852:.2f} nm   "
         f"SUNK {world.tonnage:,} GRT"
+        + (f" (+{world.bonus:,} escort)" if world.bonus else "")
+        + (f"   HULL DAMAGE {sub.damage * 100:.0f}%" if sub.damage > 0 else "")
     )
     line2 = (
         f"DEPTH {sub.depth:5.1f} m -> {sub.target_depth:5.1f} m   {sub.depth_band.upper()}"
@@ -356,7 +362,14 @@ def _draw_hud(rl, game: Game, width: int, height: int) -> None:
     tw = rl.measure_text(tag, 16)
     rl.draw_text(tag, width - tw - 10, height - 48, 16, _color(rl, HUD_DIM))
 
-    if game.paused:
+    if game.confirming_restart:
+        text = "Abandon this hunt and start a new one?   Y / R: yes    N: no"
+        tw = rl.measure_text(text, 24)
+        rl.draw_rectangle(
+            (width - tw) // 2 - 12, height // 2 - 52, tw + 24, 40, _color(rl, PANEL_BG)
+        )
+        rl.draw_text(text, (width - tw) // 2, height // 2 - 44, 24, _color(rl, ALERT))
+    elif game.paused:
         text = "PAUSED  -  P to resume"
         tw = rl.measure_text(text, 24)
         rl.draw_text(text, (width - tw) // 2, height // 2 - 40, 24, _color(rl, HUD))
@@ -383,6 +396,8 @@ LEGEND = (
     ("dot", LEAD_BAD, "target when the torpedo gets there"),
     ("line", LEAD_BAD, "miss distance: green = fire"),
     ("dot", TORPEDO, "torpedo running"),
+    ("box", HULL_MILITARY, "destroyer: sonar, depth charges (sink one for a bonus)"),
+    ("dot", DEPTH_CHARGE, "depth charge sinking"),
     ("blur", CUE, "intel / last seen (arrow when off screen)"),
 )
 LEGEND_WIDTH = 345

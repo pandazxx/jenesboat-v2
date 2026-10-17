@@ -119,6 +119,65 @@ class MerchantAIParams:
     panic_range: float  # m, a torpedo hit alerts merchants within this distance
 
 
+@dataclass(frozen=True)
+class SonarParams:
+    """A destroyer's active sonar (ASDIC): long reach, but blind to the boat's depth and easily
+    drowned by noise.  Range is ``range`` times the factors below."""
+
+    range: float  # m, quiet sea, boat at full submerged noise
+    min_range: float  # m, inside this the echo is lost (the attacker is over the boat)
+    own_noise_speed: float  # m/s, faster than this the ship's own screws deafen the set
+    own_noise_factor: float  # range multiplier while faster than that
+    interference_radius: float  # m, other ships this close add their noise to the sea
+    interference_per_ship: float  # range lost per neighbouring ship (fraction of range)
+    interference_floor: float  # range never drops below this fraction
+    quiet_speed: float  # m/s, a boat creeping at or below this is harder to hear
+    quiet_factor: float  # range multiplier for a creeping boat
+    ping_interval: float  # s between pings; the fix is as old as the last ping
+    position_error: float  # m, error of the fix (each axis) before it is used as a datum
+
+
+@dataclass(frozen=True)
+class DepthChargeParams:
+    sink_rate: float  # m/s, how fast a charge sinks to its set depth
+    lethal_radius: float  # m, a burst this close breaks the boat
+    damage_radius: float  # m, a burst this close hurts the boat
+    damage: float  # hull damage (0..1; the boat is lost at 1) at the edge of damage_radius
+    depth_error: float  # m, the pattern is layered over the boat's depth +- this
+    min_depth: float  # m, shallowest setting
+    pattern_size: int  # charges per attack run, layered in depth and thrown to both sides
+    drop_interval: float  # s between charges in a pattern
+    throw_range: float  # m, projectors throw a charge up to this far from the ship
+    scatter: float  # m, each charge lands up to this far either side of the predicted path
+    pattern_cooldown: float  # s before the same ship starts another run
+    magazine: int  # charges carried per destroyer
+
+
+@dataclass(frozen=True)
+class EscortAIParams:
+    hunters_per_escort: int  # one hunter per this many escorts (at least one), max_hunters cap
+    max_hunters: int
+    track_window: float  # s of sonar fixes used to estimate the boat's course and speed
+    track_min_baseline: float  # s, fixes closer in time than this give no course estimate
+    max_track_speed: float  # m/s, a faster estimate is noise (the boat's best submerged speed)
+    lead_limit: float  # s, the prediction is never carried further than this past the last fix
+    lose_track_time: float  # s without a fix or sighting before the escort stands down
+    station_ahead: float  # m, formation station ahead of the convoy centre
+    station_abeam: float  # m, formation station abeam of the convoy centre (alternating sides)
+    screen_distance: float  # m from the convoy centre toward the threat
+    screen_abeam: float  # m between screening ships
+    station_tolerance: float  # m, within this the ship holds course at convoy speed
+    attack_speed: float  # m/s, hunting speed (sonar is degraded above own_noise_speed)
+    approach_range: float  # m from the datum where a hunter slows so its sonar can hear
+    approach_speed: float  # m/s, the closing speed inside approach_range
+    search_speed: float  # m/s, speed while searching the datum area
+    search_start: float  # m, first search circle radius around the datum
+    search_growth: float  # m/s, how fast the circle widens as the track gets older
+    search_max: float  # m
+    shelter_distance: float  # m behind the screening ship that merchants run to
+    shelter_radius: float  # m, merchants this near the shelter point stop closing in
+
+
 # --- vessels -------------------------------------------------------------------------------
 
 TYPE_VIIC_SURFACED = VesselParams(
@@ -240,6 +299,35 @@ DECK_GUN_88 = DeckGunParams(
     hits_per_freighter=12,
 )
 
+SONAR_ASDIC = SonarParams(
+    range=3_000.0,
+    min_range=150.0,
+    own_noise_speed=15.0 * KNOT,
+    own_noise_factor=0.4,
+    interference_radius=2_500.0,
+    interference_per_ship=0.12,
+    interference_floor=0.4,
+    quiet_speed=2.5 * KNOT,
+    quiet_factor=0.7,
+    ping_interval=5.0,
+    position_error=40.0,
+)
+
+DEPTH_CHARGE = DepthChargeParams(
+    sink_rate=3.0,
+    lethal_radius=12.0,
+    damage_radius=45.0,
+    damage=0.4,
+    depth_error=25.0,
+    min_depth=15.0,
+    pattern_size=6,
+    drop_interval=1.0,
+    throw_range=150.0,
+    scatter=15.0,
+    pattern_cooldown=45.0,
+    magazine=40,
+)
+
 # --- rules ---------------------------------------------------------------------------------
 
 DETECTION = DetectionParams(
@@ -258,4 +346,28 @@ MERCHANT_AI = MerchantAIParams(
     spread_angle=20.0,
     escape_range=20_000.0,
     panic_range=6_000.0,
+)
+
+ESCORT_AI = EscortAIParams(
+    hunters_per_escort=3,
+    max_hunters=2,
+    track_window=45.0,
+    track_min_baseline=10.0,
+    max_track_speed=7.6 * KNOT,
+    lead_limit=90.0,
+    lose_track_time=300.0,
+    station_ahead=1_200.0,
+    station_abeam=1_500.0,
+    screen_distance=2_000.0,
+    screen_abeam=700.0,
+    station_tolerance=250.0,
+    attack_speed=20.0 * KNOT,
+    approach_range=1_500.0,
+    approach_speed=14.0 * KNOT,
+    search_speed=12.0 * KNOT,
+    search_start=400.0,
+    search_growth=1.0,
+    search_max=2_500.0,
+    shelter_distance=700.0,
+    shelter_radius=400.0,
 )
