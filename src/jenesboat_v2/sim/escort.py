@@ -33,6 +33,7 @@ SCREEN = "screen"
 
 FRESH_DATUM = 60.0  # s, a fix this young is good enough to drop charges on
 MERCHANT_WARNING_RANGE = 8_000.0  # m, merchants this near a contact are warned by radio
+FIRST_CHARGE_DELAY = 10.0  # s, about how long the first charge takes to sink to the boat
 TORPEDO_DATUM_HOLDOFF = 30.0  # s, a torpedo hit does not overrule a younger fix than this
 
 
@@ -56,6 +57,15 @@ class Datum:
     y: float
     t: float
     reason: str
+    vx: float = 0.0  # m/s, the boat's estimated velocity (from the recent fixes)
+    vy: float = 0.0
+    fixes: tuple[tuple[float, float, float], ...] = ()  # (t, x, y) of recent sonar/sight fixes
+
+    def predict(self, t: float, lead_limit: float = ESCORT_AI.lead_limit) -> tuple[float, float]:
+        """Where the boat should be at time ``t`` if it holds the course and speed the fixes
+        show (never carried further than ``lead_limit`` past the last fix)."""
+        dt = clamp(t - self.t, 0.0, lead_limit)
+        return self.x + self.vx * dt, self.y + self.vy * dt
 
 
 # --- sensing -------------------------------------------------------------------------------
@@ -86,11 +96,37 @@ def report(world: World, x: float, y: float, reason: str, by: str) -> None:
     if reason == "torpedo" and world.datum and t - world.datum.t < TORPEDO_DATUM_HOLDOFF:
         return
     fresh = world.datum is None
-    world.datum = Datum(x, y, t, reason)
+    world.datum = _refresh_datum(world.datum, x, y, t, reason)
     if fresh:
         world.emit("escort_alarm", reason=reason, by=by)
     # The convoy is told and runs for the screen.
     world.alert_group(x, y, "escort", by, quiet=True, radius=MERCHANT_WARNING_RANGE)
+
+
+def _refresh_datum(
+    old: Datum | None, x: float, y: float, t: float, reason: str, p: EscortAIParams = ESCORT_AI
+) -> Datum:
+    """A new fix, with the boat's course and speed worked out from the recent ones (the fixes
+    are a few tens of metres out, so only a long baseline gives a usable velocity)."""
+    if reason == "torpedo":  # a rough guess: no fixes, no velocity
+        return Datum(x, y, t, reason)
+    history = tuple(f for f in (old.fixes if old else ()) if t - f[0] <= p.track_window)
+    fixes = (*history, (t, x, y))
+    if len(fixes) < 3 or t - fixes[0][0] < p.track_min_baseline:
+        return Datum(x, y, t, reason, 0.0, 0.0, fixes)
+    # Least-squares line through the fixes: the position now and the velocity, with the noise
+    # of the individual fixes averaged out.
+    n = len(fixes)
+    mt = sum(f[0] for f in fixes) / n
+    stt = sum((f[0] - mt) ** 2 for f in fixes)
+    vx = sum((f[0] - mt) * f[1] for f in fixes) / stt
+    vy = sum((f[0] - mt) * f[2] for f in fixes) / stt
+    speed = math.hypot(vx, vy)
+    if speed > p.max_track_speed:
+        vx, vy = vx * p.max_track_speed / speed, vy * p.max_track_speed / speed
+    x = sum(f[1] for f in fixes) / n + vx * (t - mt)
+    y = sum(f[2] for f in fixes) / n + vy * (t - mt)
+    return Datum(x, y, t, reason, vx, vy, fixes)
 
 
 def _ping(world: World, ship: Ship, state: EscortState, sonar: SonarParams = SONAR_ASDIC) -> None:
@@ -195,10 +231,15 @@ def _screen(world: World, ship: Ship, rank: int, count: int, p: EscortAIParams) 
 
 
 def _drop(world: World, ship: Ship, depth_params: DepthChargeParams) -> None:
-    """One charge of the pattern: thrown to alternating sides of the track, and each set a
-    little deeper than the last so the pattern covers the whole band the boat could be in."""
+    """One charge of the pattern.  It is aimed where the boat will be when the charge has
+    sunk to its depth (the datum's predicted path), a little to one side or the other, and
+    each charge is set deeper than the last so the pattern covers the band the boat is in.
+    The projectors throw up to ``throw_range``, so the ship need not cross the boat's path;
+    a charge whose aim point is out of range is not thrown."""
     state = ship.escort
     sub = world.player
+    datum = world.datum
+    assert datum is not None
     n = depth_params.pattern_size
     k = n - state.drop_left  # 0 for the first charge of the run
     layer = k / (n - 1) if n > 1 else 0.5
@@ -207,20 +248,22 @@ def _drop(world: World, ship: Ship, depth_params: DepthChargeParams) -> None:
         depth_params.min_depth,
         sub.spec.max_depth,
     )
-    side = 1.0 if k % 2 == 0 else -1.0
-    throw = side * world.rng.uniform(0.3, 1.0) * depth_params.throw_distance
-    x, y = project(ship.x, ship.y, ship.heading + 90.0, throw)
-    world.next_charge_id += 1
-    world.depth_charges.append(DepthCharge(world.next_charge_id, x, y, set_depth, depth_params))
-    state.charges -= 1
     state.drop_left -= 1
     state.drop_timer = depth_params.drop_interval
-
-
-def pattern_half_length(ship: Ship, depth_params: DepthChargeParams = DEPTH_CHARGE) -> float:
-    """Half the ground the pattern covers at the ship's speed: the run starts this far from
-    the datum so the pattern straddles it."""
-    return max(ship.speed, 1.0) * depth_params.drop_interval * (depth_params.pattern_size - 1) / 2
+    ax, ay = datum.predict(world.time + set_depth / depth_params.sink_rate)
+    speed = math.hypot(datum.vx, datum.vy)
+    across = (
+        math.degrees(math.atan2(datum.vx, datum.vy)) + 90.0
+        if speed > 0.1
+        else world.rng.uniform(0.0, 360.0)
+    )
+    side = 1.0 if k % 2 == 0 else -1.0
+    ax, ay = project(ax, ay, across, side * world.rng.uniform(0.0, 1.0) * depth_params.scatter)
+    if distance(ship.x, ship.y, ax, ay) > depth_params.throw_range:
+        return
+    world.next_charge_id += 1
+    world.depth_charges.append(DepthCharge(world.next_charge_id, ax, ay, set_depth, depth_params))
+    state.charges -= 1
 
 
 def _hunt(
@@ -232,19 +275,22 @@ def _hunt(
 ) -> None:
     state, datum, t = ship.escort, world.datum, world.time
     assert datum is not None
-    if state.drop_left > 0:  # mid-run: hold course and speed over the datum
+    if state.drop_left > 0:  # mid-run: hold course and speed while the projectors fire
         ship.set_rudder(0.0)
         state.drop_timer -= dt
-        if state.drop_timer <= 0.0 and state.charges > 0:
-            _drop(world, ship, depth_params)
-        elif state.charges <= 0:
+        if state.charges <= 0:
             state.drop_left = 0
+        elif state.drop_timer <= 0.0:
+            _drop(world, ship, depth_params)
         return
+    # Chase where the boat will be when we get there, not where it was.
     d = distance(ship.x, ship.y, datum.x, datum.y)
+    px, py = datum.predict(t + d / max(ship.speed, p.approach_speed))
     fresh = t - datum.t <= FRESH_DATUM
     if (
         fresh
-        and d <= pattern_half_length(ship, depth_params)
+        and distance(ship.x, ship.y, *datum.predict(t + FIRST_CHARGE_DELAY))
+        <= depth_params.throw_range
         and t >= state.cooldown_until
         and state.charges > 0
     ):
@@ -254,7 +300,7 @@ def _hunt(
         _drop(world, ship, depth_params)
         return
     if fresh:
-        _goto(ship, datum.x, datum.y, p.attack_speed if d > p.approach_range else p.approach_speed)
+        _goto(ship, px, py, p.attack_speed if d > p.approach_range else p.approach_speed)
         return
     # No recent fix: sweep a widening square around the datum.
     radius = clamp(p.search_start + p.search_growth * (t - datum.t), p.search_start, p.search_max)

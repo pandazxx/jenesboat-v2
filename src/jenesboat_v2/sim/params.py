@@ -147,7 +147,8 @@ class DepthChargeParams:
     min_depth: float  # m, shallowest setting
     pattern_size: int  # charges per attack run, layered in depth and thrown to both sides
     drop_interval: float  # s between charges in a pattern
-    throw_distance: float  # m, charges are thrown this far to either side of the track
+    throw_range: float  # m, projectors throw a charge up to this far from the ship
+    scatter: float  # m, each charge lands up to this far either side of the predicted path
     pattern_cooldown: float  # s before the same ship starts another run
     magazine: int  # charges carried per destroyer
 
@@ -156,6 +157,10 @@ class DepthChargeParams:
 class EscortAIParams:
     hunters_per_escort: int  # one hunter per this many escorts (at least one), max_hunters cap
     max_hunters: int
+    track_window: float  # s of sonar fixes used to estimate the boat's course and speed
+    track_min_baseline: float  # s, fixes closer in time than this give no course estimate
+    max_track_speed: float  # m/s, a faster estimate is noise (the boat's best submerged speed)
+    lead_limit: float  # s, the prediction is never carried further than this past the last fix
     lose_track_time: float  # s without a fix or sighting before the escort stands down
     station_ahead: float  # m, formation station ahead of the convoy centre
     station_abeam: float  # m, formation station abeam of the convoy centre (alternating sides)
@@ -312,12 +317,13 @@ DEPTH_CHARGE = DepthChargeParams(
     sink_rate=3.0,
     lethal_radius=12.0,
     damage_radius=45.0,
-    damage=0.5,
+    damage=0.4,
     depth_error=25.0,
     min_depth=15.0,
     pattern_size=6,
     drop_interval=1.0,
-    throw_distance=30.0,
+    throw_range=150.0,
+    scatter=15.0,
     pattern_cooldown=45.0,
     magazine=40,
 )
@@ -345,6 +351,10 @@ MERCHANT_AI = MerchantAIParams(
 ESCORT_AI = EscortAIParams(
     hunters_per_escort=3,
     max_hunters=2,
+    track_window=45.0,
+    track_min_baseline=10.0,
+    max_track_speed=7.6 * KNOT,
+    lead_limit=90.0,
     lose_track_time=300.0,
     station_ahead=1_200.0,
     station_abeam=1_500.0,

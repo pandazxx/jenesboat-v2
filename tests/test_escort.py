@@ -174,7 +174,7 @@ def test_hunter_runs_in_and_drops_a_pattern_on_a_boat_that_stays_put():
     world.player.depth = world.player.target_depth = 20.0
     evs = run(world, 280)
     assert "depth_charge_run" in kinds(evs)
-    assert kinds(evs).count("depth_charge") >= DEPTH_CHARGE.pattern_size
+    assert kinds(evs).count("depth_charge") >= 3  # the pattern, less any out of reach
     hunter = next(d for d in destroyers(world) if d.escort.mode == HUNT)
     assert hunter.escort.charges < DEPTH_CHARGE.magazine
 
@@ -239,29 +239,58 @@ def test_sheltering_merchants_never_head_toward_the_boat():
             assert abs(angle_diff(shelter_heading(m), away)) <= 90.0 + 1e-6
 
 
-def test_a_depth_charge_run_is_a_pattern_spread_to_both_sides_and_layered_in_depth():
+def test_a_depth_charge_run_is_a_pattern_spread_over_an_area_and_layered_in_depth():
     world = convoy_world(escorts=2, sub_dx=1_200.0, sub_dy=-2_000.0)
     world.player.depth = world.player.target_depth = 30.0
     seen: list[DepthCharge] = []
     for _ in range(4_000):
         world.step(0.1)
+        if any(e["event"] == "depth_charge_run" for e in world.events) and seen:
+            break  # the second run starts: keep only the first
+        world.events.clear()
         for c in world.depth_charges:
             if c not in seen:
                 seen.append(c)
-        if len(seen) >= DEPTH_CHARGE.pattern_size:
-            break
-    run_charges = seen[: DEPTH_CHARGE.pattern_size]
-    assert len(run_charges) == DEPTH_CHARGE.pattern_size
+    run_charges = seen
+    assert 3 <= len(run_charges) <= DEPTH_CHARGE.pattern_size
     depths = [c.set_depth for c in run_charges]
-    assert depths == sorted(depths) and depths[-1] - depths[0] >= DEPTH_CHARGE.depth_error
-    assert min(depths) < 30.0 < max(depths)  # layered around the boat's depth
+    assert depths == sorted(depths) and depths[-1] - depths[0] >= DEPTH_CHARGE.depth_error / 2
+    spread = max(distance(a.x, a.y, b.x, b.y) for a in run_charges for b in run_charges)
+    assert spread >= 5.0  # an area, not one point
     hunter = next(d for d in destroyers(world) if d.escort.mode == HUNT)
-    side = [
-        (c.x - hunter.x) * math.cos(math.radians(hunter.heading))
-        - (c.y - hunter.y) * math.sin(math.radians(hunter.heading))
-        for c in run_charges
-    ]
-    assert any(v > 0 for v in side) and any(v < 0 for v in side)
+    assert all(
+        distance(hunter.x, hunter.y, c.x, c.y) < 600.0 for c in run_charges
+    )  # thrown from the ship, not magic
+
+
+def test_a_boat_that_circles_is_still_depth_charged_without_the_hunter_crossing_its_path():
+    world = convoy_world(escorts=2, sub_dx=1_200.0, sub_dy=-2_000.0)
+    sub = world.player
+    sub.depth = sub.target_depth = 30.0
+    sub.set_throttle(0.25)
+    sub.set_rudder(1.0)  # a tight circle: the hunter's course never has to cross it
+    sub.speed = sub.target_speed()
+    evs = run(world, 600)
+    bursts = [e for e in evs if e["event"] == "depth_charge"]
+    assert len(bursts) >= DEPTH_CHARGE.pattern_size
+    assert sub.damage > 0.0 or any(e["damage"] > 0 for e in bursts)
+
+
+def test_the_datum_works_out_the_boats_course_and_leads_it():
+    from jenesboat_v2.sim.escort import Datum, _refresh_datum
+
+    datum = None
+    for i in range(10):  # a fix every 5 s: 3 m/s due east, 40 m of noise on each axis
+        t = 5.0 * i
+        noise = ((-1) ** i) * 30.0
+        datum = _refresh_datum(datum, 1_000.0 + 3.0 * t + noise, 500.0 - noise, t, "sonar")
+    assert isinstance(datum, Datum)
+    assert abs(datum.vx - 3.0) < 1.5 and abs(datum.vy) < 1.5
+    px, _ = datum.predict(datum.t + 20.0)
+    assert px > datum.x + 20.0
+    assert datum.predict(datum.t + 10_000.0) == datum.predict(datum.t + ESCORT_AI.lead_limit)
+    rough = _refresh_datum(datum, 0.0, 0.0, 60.0, "torpedo")
+    assert (rough.vx, rough.vy) == (0.0, 0.0) and rough.fixes == ()
 
 
 # --- losing the track ----------------------------------------------------------------------------

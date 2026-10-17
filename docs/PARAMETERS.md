@@ -105,14 +105,25 @@ multiplied by:
 The echo is lost inside 150 m (the attacker runs over the boat on its last fix). A fix has a
 +-40 m error per axis. The boat's depth is not measured.
 
-**Depth charges** (`DEPTH_CHARGE`). Sink at 3 m/s. A run drops a pattern of 6 charges 1 s
-apart, timed so the pattern straddles the datum. The charges are thrown 10-30 m to alternating
-sides of the track and set in layers from 25 m above to 25 m below the boat's estimated depth
-(never shallower than 15 m), so a run covers an area and a depth band rather than one point.
-A burst within 12 m of the boat breaks it; out to 45 m it does up to 50 % hull damage, falling
-off linearly, in 3D (depth counts). Damage accumulates and is never repaired; the boat is lost
-at 100 %. 45 s between runs; 40 charges per ship. Rough odds against a boat that sits still
-for two runs: about 30 % lost when deep, certain at periscope depth; creeping away halves that.
+**Tracking.** Every sonar fix or sighting goes into a 45 s window; a least-squares line through
+it gives the escorts the boat's position now (the +-40 m noise of single fixes averages out)
+and its course and speed (needs three fixes over at least 10 s, capped at 7.6 kn). A torpedo hit
+gives a rough position and no course. The prediction is carried at most 90 s past the last fix.
+
+**Depth charges** (`DEPTH_CHARGE`). Projectors throw a charge up to 150 m from the ship, so a
+destroyer does not have to cross the boat's path: a run starts as soon as the predicted
+position of the boat (10 s ahead, about how long the first charge takes to sink) is within
+150 m, and hunters steer for the predicted position rather than the last fix. A run is 6
+charges 1 s apart. Each is aimed where the boat will be when that charge has sunk to its depth
+(the predicted path), up to 15 m to either side of it, and set deeper than the one before, in
+layers from 25 m above to 25 m below the estimated depth (never shallower than 15 m).
+A charge whose aim point is beyond 150 m is not thrown. Charges sink at 3 m/s. A burst within
+12 m of the boat breaks it; out to 45 m it does up to 40 % hull damage, falling off linearly,
+in 3D (depth counts). Damage accumulates and is never repaired; the boat is lost at 100 %.
+45 s between runs; 40 charges per ship. Rough odds against a boat that holds a steady course or
+sits still for about 3 minutes after being found: half are lost when deep, all at periscope
+depth. Circling does not help (the prediction stays on the circle's area); what helps is
+leaving the area quietly and changing course, so the track is lost.
 
 **Escort AI** (`ESCORT_AI`, code in `sim/escort.py`):
 
@@ -121,7 +132,7 @@ for two runs: about 30 % lost when deep, certain at periscope depth; creeping aw
 | formation | hold the station relative to the merchants' centre and route, at the convoy's speed |
 | alarm | a sonar fix, a lookout sighting or a torpedo hit sets the group's *datum* (where the boat is). The convoy is told (merchants within 8 km run) |
 | split | the escorts nearest the datum hunt (`hunters_per_escort` = 1 hunter per 3 escorts, 1 to 2); the rest screen. A lost hunter is replaced from the screens |
-| hunt | run in at 20 kn, slow to 14 kn inside 1.5 km, drop a pattern on the datum. Without a fix younger than 60 s sweep a square around the datum that widens by 1 m/s (400 m to 2.5 km) |
+| hunt | steer for the predicted position of the boat, 20 kn, slow to 14 kn inside 1.5 km, throw a pattern from up to 150 m away. Without a fix younger than 60 s sweep a square around the datum that widens by 1 m/s (400 m to 2.5 km) |
 | screen | stand 2 km from the convoy centre toward the datum, 700 m apart, facing the threat |
 | stand down | no fix or sighting for 300 s: everyone returns to formation |
 | merchants | an alerted merchant that is nearer the threat than the nearest non-hunting escort slips in behind it (the point 700 m behind it, never steering more than 90° from directly away from the boat); one already behind the escort keeps running away. With no escort it just runs away (M1 rule) |
