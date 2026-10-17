@@ -21,7 +21,8 @@ Zoomed out (`-`), x4 time (`3`) while closing.
 - When a destroyer pings the boat the log shows `ESCORT: destroyer-N pinged us` (or `sighted
   us` if seen on the surface) and `escort splits: destroyer-A hunting, destroyer-B screening`.
 - The hunter turns toward you, slows to about 14 kn near the boat and the log shows
-  `destroyer-A is making a depth charge run`; orange dots (charges) sink and a burst within
+  `destroyer-A is making a depth charge run`; a pattern of 6 orange dots (charges) falls on both sides of its track, set at different depths,
+  and a burst within
   about 40 m prints `DEPTH CHARGE close!` and `hull damage N%` (also in HUD line 1b).
 - Creeping away quietly and deep reduces how often it is found; the damage is never repaired;
   enough damage ends the hunt with `HUNT OVER (the boat was sunk)`.

@@ -6,7 +6,7 @@ import math
 
 from jenesboat_v2.sim import World, hunting_scenario, new_ship
 from jenesboat_v2.sim.escort import FORMATION, HUNT, SCREEN, hunters_wanted, sonar_range
-from jenesboat_v2.sim.geo import distance
+from jenesboat_v2.sim.geo import bearing, distance
 from jenesboat_v2.sim.params import (
     DEPTH_CHARGE,
     DESTROYER,
@@ -219,6 +219,49 @@ def test_damage_accumulates_but_does_not_kill_by_a_distant_burst():
         world.depth_charges.append(c)
     run(world, 1)
     assert 0.0 < sub.damage < 1.0 or sub.destroyed
+
+
+def test_sheltering_merchants_never_head_toward_the_boat():
+    from jenesboat_v2.sim.ai import shelter_heading
+    from jenesboat_v2.sim.geo import angle_diff
+
+    world = convoy_world(escorts=2, sub_dx=1_200.0, sub_dy=-2_000.0)
+    run(world, 30)
+    sub = world.player
+    for dx in range(-6_000, 6_001, 1_000):  # merchants strung out on either side of the screen
+        for dy in range(-4_000, 4_001, 1_000):
+            m = world.merchants[0]
+            m.x, m.y = C + dx, C + dy
+            m.alert(world.time, sub.x, sub.y, 600.0)
+            guard = destroyers(world)[0]
+            m.shelter = (guard.x + 300.0, guard.y + 600.0)
+            away = bearing(sub.x, sub.y, m.x, m.y)
+            assert abs(angle_diff(shelter_heading(m), away)) <= 90.0 + 1e-6
+
+
+def test_a_depth_charge_run_is_a_pattern_spread_to_both_sides_and_layered_in_depth():
+    world = convoy_world(escorts=2, sub_dx=1_200.0, sub_dy=-2_000.0)
+    world.player.depth = world.player.target_depth = 30.0
+    seen: list[DepthCharge] = []
+    for _ in range(4_000):
+        world.step(0.1)
+        for c in world.depth_charges:
+            if c not in seen:
+                seen.append(c)
+        if len(seen) >= DEPTH_CHARGE.pattern_size:
+            break
+    run_charges = seen[: DEPTH_CHARGE.pattern_size]
+    assert len(run_charges) == DEPTH_CHARGE.pattern_size
+    depths = [c.set_depth for c in run_charges]
+    assert depths == sorted(depths) and depths[-1] - depths[0] >= DEPTH_CHARGE.depth_error
+    assert min(depths) < 30.0 < max(depths)  # layered around the boat's depth
+    hunter = next(d for d in destroyers(world) if d.escort.mode == HUNT)
+    side = [
+        (c.x - hunter.x) * math.cos(math.radians(hunter.heading))
+        - (c.y - hunter.y) * math.sin(math.radians(hunter.heading))
+        for c in run_charges
+    ]
+    assert any(v > 0 for v in side) and any(v < 0 for v in side)
 
 
 # --- losing the track ----------------------------------------------------------------------------

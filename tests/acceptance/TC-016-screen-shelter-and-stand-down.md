@@ -17,8 +17,8 @@ Fresh hunt (`R`), the whole group in sight at periscope depth.
 
 - After the hit the destroyers react: one hunts toward the torpedo's launch point (about 2 km
   behind the hit), the other places itself between you and the merchants.
-- The surviving merchants run toward the screening destroyer and keep it between you and them,
-  instead of fleeing straight away from you.
+- The surviving merchants keep running away from you, tucking in behind the screening
+  destroyer; none of them ever turns toward you to reach it.
 - A hunter that finds nothing sweeps a widening square around the last fix. After 5 minutes
   without a fix `escort lost the track, back to formation` appears and both destroyers go back
   to their stations beside the merchants.

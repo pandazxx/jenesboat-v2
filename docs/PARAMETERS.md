@@ -105,11 +105,14 @@ multiplied by:
 The echo is lost inside 150 m (the attacker runs over the boat on its last fix). A fix has a
 +-40 m error per axis. The boat's depth is not measured.
 
-**Depth charges** (`DEPTH_CHARGE`). Sink at 3 m/s to a setting guessed from the boat's depth
-+-25 m (never shallower than 15 m). A burst within 12 m of the boat breaks it; out to 40 m it
-does up to 50 % hull damage, falling off linearly, in 3D (depth counts). Damage accumulates and
-is never repaired; the boat is lost at 100 %. A run drops 5 charges 1 s apart when the datum
-is within 90 m; 45 s between runs; 24 charges per ship.
+**Depth charges** (`DEPTH_CHARGE`). Sink at 3 m/s. A run drops a pattern of 6 charges 1 s
+apart, timed so the pattern straddles the datum. The charges are thrown 10-30 m to alternating
+sides of the track and set in layers from 25 m above to 25 m below the boat's estimated depth
+(never shallower than 15 m), so a run covers an area and a depth band rather than one point.
+A burst within 12 m of the boat breaks it; out to 45 m it does up to 50 % hull damage, falling
+off linearly, in 3D (depth counts). Damage accumulates and is never repaired; the boat is lost
+at 100 %. 45 s between runs; 40 charges per ship. Rough odds against a boat that sits still
+for two runs: about 30 % lost when deep, certain at periscope depth; creeping away halves that.
 
 **Escort AI** (`ESCORT_AI`, code in `sim/escort.py`):
 
@@ -121,7 +124,7 @@ is within 90 m; 45 s between runs; 24 charges per ship.
 | hunt | run in at 20 kn, slow to 14 kn inside 1.5 km, drop a pattern on the datum. Without a fix younger than 60 s sweep a square around the datum that widens by 1 m/s (400 m to 2.5 km) |
 | screen | stand 2 km from the convoy centre toward the datum, 700 m apart, facing the threat |
 | stand down | no fix or sighting for 300 s: everyone returns to formation |
-| merchants | an alerted merchant runs for the point 700 m behind the nearest non-hunting escort (as seen from the threat) and stays on its far side; with no escort it just runs away (M1 rule) |
+| merchants | an alerted merchant that is nearer the threat than the nearest non-hunting escort slips in behind it (the point 700 m behind it, never steering more than 90° from directly away from the boat); one already behind the escort keeps running away. With no escort it just runs away (M1 rule) |
 
 A torpedo hit gives only a rough datum (2 km back along the torpedo's track) and never replaces
 a fix younger than 30 s.

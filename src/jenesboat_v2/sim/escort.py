@@ -195,20 +195,32 @@ def _screen(world: World, ship: Ship, rank: int, count: int, p: EscortAIParams) 
 
 
 def _drop(world: World, ship: Ship, depth_params: DepthChargeParams) -> None:
+    """One charge of the pattern: thrown to alternating sides of the track, and each set a
+    little deeper than the last so the pattern covers the whole band the boat could be in."""
     state = ship.escort
     sub = world.player
+    n = depth_params.pattern_size
+    k = n - state.drop_left  # 0 for the first charge of the run
+    layer = k / (n - 1) if n > 1 else 0.5
     set_depth = clamp(
-        sub.depth + world.rng.uniform(-depth_params.depth_error, depth_params.depth_error),
+        sub.depth + depth_params.depth_error * (2.0 * layer - 1.0),
         depth_params.min_depth,
         sub.spec.max_depth,
     )
+    side = 1.0 if k % 2 == 0 else -1.0
+    throw = side * world.rng.uniform(0.3, 1.0) * depth_params.throw_distance
+    x, y = project(ship.x, ship.y, ship.heading + 90.0, throw)
     world.next_charge_id += 1
-    world.depth_charges.append(
-        DepthCharge(world.next_charge_id, ship.x, ship.y, set_depth, depth_params)
-    )
+    world.depth_charges.append(DepthCharge(world.next_charge_id, x, y, set_depth, depth_params))
     state.charges -= 1
     state.drop_left -= 1
     state.drop_timer = depth_params.drop_interval
+
+
+def pattern_half_length(ship: Ship, depth_params: DepthChargeParams = DEPTH_CHARGE) -> float:
+    """Half the ground the pattern covers at the ship's speed: the run starts this far from
+    the datum so the pattern straddles it."""
+    return max(ship.speed, 1.0) * depth_params.drop_interval * (depth_params.pattern_size - 1) / 2
 
 
 def _hunt(
@@ -230,7 +242,12 @@ def _hunt(
         return
     d = distance(ship.x, ship.y, datum.x, datum.y)
     fresh = t - datum.t <= FRESH_DATUM
-    if fresh and d <= depth_params.drop_radius and t >= state.cooldown_until and state.charges > 0:
+    if (
+        fresh
+        and d <= pattern_half_length(ship, depth_params)
+        and t >= state.cooldown_until
+        and state.charges > 0
+    ):
         state.cooldown_until = t + depth_params.pattern_cooldown
         state.drop_left = depth_params.pattern_size
         world.emit("depth_charge_run", ship=ship.ship_id, charges=state.charges)

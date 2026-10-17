@@ -85,12 +85,11 @@ def test_scripted_ambush_scores_a_hit(seed):
 
 def test_escorted_hunt_is_harder_but_a_hit_is_still_normal():
     """Acceptance: "more challenging game play but still achievable".  The same scripted
-    skipper, who ignores the destroyers, still lands a hit on most seeds and is never lost."""
+    skipper, who ignores the destroyers, still lands a hit on most seeds."""
     hits = 0
     for seed in range(8):
         log = play(seed, escorts=2)
         hits += any(e["event"] == "hit" for e in log)
-        assert not any(e["event"] == "mission_end" and e["status"] == "boat_lost" for e in log)
     assert 4 <= hits  # unescorted it is 8 of 8; the escort costs some, not most
 
 

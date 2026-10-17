@@ -143,11 +143,11 @@ class DepthChargeParams:
     lethal_radius: float  # m, a burst this close breaks the boat
     damage_radius: float  # m, a burst this close hurts the boat
     damage: float  # hull damage (0..1; the boat is lost at 1) at the edge of damage_radius
-    depth_error: float  # m, how well the sonar operator guesses the boat's depth
+    depth_error: float  # m, the pattern is layered over the boat's depth +- this
     min_depth: float  # m, shallowest setting
-    pattern_size: int  # charges dropped per attack run
+    pattern_size: int  # charges per attack run, layered in depth and thrown to both sides
     drop_interval: float  # s between charges in a pattern
-    drop_radius: float  # m, a run starts when the datum is this close ahead
+    throw_distance: float  # m, charges are thrown this far to either side of the track
     pattern_cooldown: float  # s before the same ship starts another run
     magazine: int  # charges carried per destroyer
 
@@ -311,15 +311,15 @@ SONAR_ASDIC = SonarParams(
 DEPTH_CHARGE = DepthChargeParams(
     sink_rate=3.0,
     lethal_radius=12.0,
-    damage_radius=40.0,
+    damage_radius=45.0,
     damage=0.5,
     depth_error=25.0,
     min_depth=15.0,
-    pattern_size=5,
+    pattern_size=6,
     drop_interval=1.0,
-    drop_radius=90.0,
+    throw_distance=30.0,
     pattern_cooldown=45.0,
-    magazine=24,
+    magazine=40,
 )
 
 # --- rules ---------------------------------------------------------------------------------

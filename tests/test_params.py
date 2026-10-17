@@ -43,7 +43,7 @@ def test_escort_balance_relations():
     # Sonar outreaches a periscope lookout, yet the fleet's own noise can drown it.
     assert sonar.range * sonar.quiet_factor > P.DETECTION.periscope_range * P.DESTROYER.lookout
     assert sonar.range * sonar.interference_floor < P.DETECTION.periscope_range * 2
-    assert sonar.min_range < dc.drop_radius * 2
+    assert sonar.min_range < sonar.range * sonar.interference_floor
     # Charges: lethal inside damage, a boat cannot be lost to a single distant burst.
     assert dc.lethal_radius < dc.damage_radius and 0 < dc.damage < 1
     assert dc.magazine >= dc.pattern_size * 2
