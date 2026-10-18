@@ -121,7 +121,7 @@ class TouchPad:
         )
 
     def show(self, confirming: bool, paused: bool, time_scale: int, legend: bool) -> None:
-        """Update the button labels (YES/NO prompt, RUN/PAUSE, x1..x8) when they change."""
+        """Update the button labels (YES/NO prompt, RUN/PAUSE, x1..x32) when they change."""
         state = (bool(confirming), bool(paused), int(time_scale), bool(legend))
         if self.bridge is None or state == self._shown:
             return

@@ -14,7 +14,7 @@ An iPhone 16 (or any phone) in Safari or Chrome, the build URL open, the phone h
 1. Hold the phone upright (portrait) and look at the page.
 2. Turn it sideways and wait for the HUD.
 3. Read the HUD lines (`HDG`, `DEPTH`, `TUBES`), the contact panel on the right and the
-   message log at the bottom. Tap `?` to hide the legend.
+   message log at the bottom. Tap `?` to show the legend, read it, tap `?` to hide it.
 4. Press `AHEAD` four times and watch the boat and the grid.
 5. Optional: add the page to the home screen and open it from there.
 
@@ -26,8 +26,8 @@ An iPhone 16 (or any phone) in Safari or Chrome, the build URL open, the phone h
   buttons keep clear of it; ocean may run under it).
 - The HUD text is readable at arm's length (it is about 20 % bigger relative to the screen
   than on a desktop) and complete: nothing is cut off at the right edge. The message log
-  sits between the two button clusters and long messages wrap. The legend opens centred and
-  `?` hides it.
+  sits between the two button clusters and long messages wrap. No legend is up at the start;
+  `?` opens it centred and hides it again.
 - The grid squares are square and the boat is a round dot (nothing is stretched); the map is
   wider than on a 16:9 desktop window (the `km` grid labels show more columns).
 - Opened from the home screen the game is full screen without browser bars.

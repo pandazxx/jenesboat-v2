@@ -23,7 +23,7 @@ just sim --seconds 30 --trace --seed 7 \
 compression. Order keys: `throttle` (-1..1) or `telegraph` (`"ahead half"`, `"stop"`, ...),
 `rudder` (-1..1, +1 = 35° starboard, stays until the next order), `dive` (Space: one band
 shallower, or periscope depth from the surface), `deep` (C), `target_depth` (metres), `fire`
-(F), `time_scale` (1, 2, 4 or 8), `target` (a ship id, or `null` for automatic), `next_target`,
+(F), `time_scale` (1, 2, 4, 8, 16 or 32), `target` (a ship id, or `null` for automatic), `next_target`,
 `pause` (toggle; the headless clock keeps running but the world
 does not, so a paused stretch shortens the simulated time).
 
@@ -147,9 +147,9 @@ and summary as the `agent-smoke-<name>` artifact.
 | F     | fire a torpedo along the heading                         |
 | T     | next target (cycles through the contacts; otherwise the nearest is the target) |
 | - / = | zoom out / in                                            |
-| 1-4   | time compression x1 / x2 / x4 / x8                       |
+| 1-6   | time compression x1 / x2 / x4 / x8 / x16 / x32           |
 | P     | pause / resume                                           |
-| L     | show / hide the symbol legend (on at the start)          |
+| L     | show / hide the symbol legend (off at the start)         |
 | R     | new hunt (new seed); asks first, Y/R confirms, N cancels |
 
 Playwright key names for `--keys`: letters as is, `Space`, `Minus`, `Equal`, `Digit4`.

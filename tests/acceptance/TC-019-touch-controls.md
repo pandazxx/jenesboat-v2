@@ -6,7 +6,8 @@ added_in: 20
 ---
 ## Preconditions
 
-TC-018 passed: the game runs on a phone held sideways. Legend hidden (`?`).
+TC-018 passed: the game runs on a phone held sideways. The ship cluster (bottom left) has
+`AHEAD` over `ASTERN` in a column and `PORT` / `MID` / `STBD` in a row along the bottom.
 
 ## Steps
 
@@ -14,7 +15,7 @@ TC-018 passed: the game runs on a phone held sideways. Legend hidden (`?`).
 2. Hold `STBD` for about two seconds, let go, wait, then tap `MID`. Hold `PORT` and, while
    holding it, tap `AHEAD` with the other hand.
 3. Tap `DIVE`, wait for periscope depth, tap `DEEP`, then `DIVE` again.
-4. Tap `x1` four times, reading the HUD after each tap. Tap `-` and `+`.
+4. Tap `x1` six times, reading the HUD after each tap. Tap `-` and `+`.
 5. Tap `PAUSE`, then the same button again.
 6. Once a ship is in sight tap `TGT` and `FIRE`.
 7. Tap `NEW`; tap `NO`. Tap `NEW` again; tap `YES`.
@@ -27,8 +28,8 @@ TC-018 passed: the game runs on a phone held sideways. Legend hidden (`?`).
   released, the boat keeps turning, and `MID` returns it to `AMIDSHIPS`. Holding `PORT` and
   tapping `AHEAD` at the same time does both (two fingers).
 - Step 3: `DEPTH` goes to periscope depth (12 m), then 60 m, then back to periscope depth.
-- Step 4: the button and the HUD read `x2`, `x4`, `x8`, `x1` in turn; the map zooms out and
-  in.
+- Step 4: the button and the HUD read `x2`, `x4`, `x8`, `x16`, `x32`, `x1` in turn; the map
+  zooms out and in.
 - Step 5: the HUD shows `TIME PAUSED` and the banner `PAUSED - RUN to resume`, the button
   reads `RUN`; tapping it resumes.
 - Step 6: the target ring moves to the next contact, a torpedo runs.

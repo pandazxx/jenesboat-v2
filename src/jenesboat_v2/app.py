@@ -44,6 +44,8 @@ KEYBOARD = {
     "2": "KEY_TWO",
     "3": "KEY_THREE",
     "4": "KEY_FOUR",
+    "5": "KEY_FIVE",
+    "6": "KEY_SIX",
     "P": "KEY_P",
     "L": "KEY_L",
     "R": "KEY_R",
@@ -161,7 +163,7 @@ def controls_from_keys(pressed: set[str], held: set[str], time_scale: int) -> Co
     """Turn button names (keyboard or touch) into this frame's ``Controls``.  ``TIME`` is
     the touch button that steps through the time compressions."""
     scale = None
-    for name, value in zip(("1", "2", "3", "4"), TIME_SCALES, strict=True):
+    for name, value in zip(("1", "2", "3", "4", "5", "6"), TIME_SCALES, strict=True):
         if name in pressed:
             scale = value
     if "TIME" in pressed:

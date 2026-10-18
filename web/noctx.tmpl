@@ -302,12 +302,19 @@ config = {
             color: #061224;
         }
         #touch button.hold { border-style: double; }
+        /* Telegraph in a column at the left (AHEAD over ASTERN), rudder in a row along the
+           bottom (PORT, MID, STBD). */
         #pad-ship {
             left: max(10px, env(safe-area-inset-left));
             bottom: max(10px, env(safe-area-inset-bottom));
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(4, auto);
+            grid-template-rows: repeat(2, auto);
         }
-        #pad-ship [data-key="W"], #pad-ship [data-key="S"] { grid-column: 2; }
+        #pad-ship [data-key="W"] { grid-column: 1; grid-row: 1; }
+        #pad-ship [data-key="S"] { grid-column: 1; grid-row: 2; }
+        #pad-ship [data-key="A"] { grid-column: 2; grid-row: 2; }
+        #pad-ship [data-key="Q"] { grid-column: 3; grid-row: 2; }
+        #pad-ship [data-key="D"] { grid-column: 4; grid-row: 2; }
         #pad-attack {
             right: max(10px, env(safe-area-inset-right));
             bottom: max(10px, env(safe-area-inset-bottom));
@@ -425,10 +432,10 @@ height="1px"
     <div id="touch">
         <div class="cluster" id="pad-ship">
             <button data-key="W">AHEAD</button>
+            <button data-key="S">ASTERN</button>
             <button data-key="A" class="hold">&#9664; PORT</button>
             <button data-key="Q">MID</button>
             <button data-key="D" class="hold">STBD &#9654;</button>
-            <button data-key="S">ASTERN</button>
         </div>
         <div class="cluster" id="pad-attack">
             <button data-key="SPACE">DIVE</button>

@@ -32,15 +32,15 @@ The major enemy ship types are merchant and military ships. They offen comes in 
 | F     | fire a torpedo along the heading                         |
 | T     | next target (cycles through the contacts; otherwise the nearest is the target) |
 | - / = | zoom out / in                                            |
-| 1-4   | time compression x1 / x2 / x4 / x8                       |
+| 1-6   | time compression x1 / x2 / x4 / x8 / x16 / x32           |
 | P     | pause / resume                                           |
-| L     | show / hide the symbol legend (on at the start)          |
+| L     | show / hide the symbol legend (off at the start)         |
 | R     | new hunt (new seed); asks first, Y/R confirms, N cancels |
 
 On a touch screen (phone or tablet, held sideways) the web build shows the same orders as
 on-screen buttons: `AHEAD` / `ASTERN` (W / S), `PORT` / `STBD` (held, A / D), `MID` (Q),
 `DIVE` / `DEEP` / `FIRE` / `TGT` (Space / C / F / T), a row under the HUD with `PAUSE`,
-the time compression (`x1` cycles 1-2-4-8), zoom `-` / `+`, `?` (legend) and `NEW` (R), and
+the time compression (`x1` cycles 1-2-4-8-16-32), zoom `-` / `+`, `?` (legend) and `NEW` (R), and
 `YES` / `NO` when the game asks before abandoning a hunt. The game fills the whole screen in
 landscape; in portrait it asks you to turn the phone.
 

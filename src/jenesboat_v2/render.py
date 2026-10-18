@@ -368,7 +368,7 @@ def _draw_hud(rl, game: Game, width: int, height: int, pad: Pad | None) -> None:
     if pad is None:
         help_line = (
             "W/S telegraph  A/D rudder  Q midships  SPACE dive  C deep  F fire  T target  "
-            "-/= zoom  1-4 time  P pause  L legend"
+            "-/= zoom  1-6 time  P pause  L legend"
         )
         rl.draw_text(help_line, left, bottom, 16, _color(rl, HUD_DIM))
     scale_px = int(1000.0 / game.zoom)

@@ -82,7 +82,7 @@ def test_fire_zoom_and_time_controls(captured):
     for _ in range(10):
         game.apply(Controls(zoom_out=True), 0.1)
     assert game.zoom == ZOOM_LEVELS[-1]
-    game.apply(Controls(time_scale=8), 0.1)
+    game.apply(Controls(time_scale=32), 0.1)
     assert game.time_scale == TIME_SCALES[-1]
     game.apply(Controls(time_scale=9), 0.1)  # not a known compression: ignored
     assert game.time_scale == TIME_SCALES[-1]

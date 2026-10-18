@@ -52,7 +52,7 @@ def build_parser() -> argparse.ArgumentParser:
             "headless: JSON list of timed orders, e.g. "
             '\'[{"t":0,"throttle":1},{"t":5,"rudder":1},{"t":8,"dive":true}]\'. '
             "Keys: throttle (-1..1) or telegraph ('ahead half', ...), rudder (-1..1), "
-            "dive (toggle), deep, target_depth (m), fire, time_scale (1, 2, 4 or 8), "
+            "dive (toggle), deep, target_depth (m), fire, time_scale (1, 2, 4, 8, 16 or 32), "
             "pause (toggle), target (ship id, or null for automatic), next_target."
         ),
     )

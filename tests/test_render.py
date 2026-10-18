@@ -142,18 +142,18 @@ def test_draws_sonar_ghosts_and_the_sonar_target_panel():
     assert calls.count("draw_rectangle_pro") == 3  # ghost hulls at the estimated positions
 
 
-def test_legend_is_on_by_default_and_l_toggles_it():
+def test_legend_is_off_by_default_and_l_toggles_it():
     game = Game(seed=1, state_interval=float("inf"))
+    assert not game.show_legend
+    without = draw(game, legend=game.show_legend)
+    assert "draw_rectangle" not in without  # no legend panel
+    game.apply(Controls(legend=True), 0.1)
     assert game.show_legend
     with_legend = draw(game, legend=True)
     assert "draw_rectangle" in with_legend  # the legend background
-    game.apply(Controls(legend=True), 0.1)
-    assert not game.show_legend
-    without = draw(game, legend=game.show_legend)
-    assert "draw_rectangle" not in without
     assert with_legend.count("draw_text") > without.count("draw_text")
     game.apply(Controls(legend=True), 0.1)
-    assert game.show_legend
+    assert not game.show_legend
 
 
 def test_paused_banner():

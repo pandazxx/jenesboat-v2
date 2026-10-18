@@ -124,8 +124,9 @@ def test_time_button_cycles_through_the_compressions_and_digits_pick_one():
     for _ in range(len(TIME_SCALES) + 1):
         scale = app.controls_from_keys({"TIME"}, set(), scale).time_scale
         seen.append(scale)
-    assert seen == [2, 4, 8, 1, 2]
+    assert seen == [2, 4, 8, 16, 32, 1, 2]
     assert app.controls_from_keys({"3"}, set(), 1).time_scale == 4
+    assert app.controls_from_keys({"6"}, set(), 1).time_scale == 32
     assert app.controls_from_keys({"TIME"}, set(), 99).time_scale == 2  # unknown scale: restart
 
 

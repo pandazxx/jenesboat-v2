@@ -17,7 +17,7 @@ from jenesboat_v2.sim.detection import VISUAL, Contact
 from jenesboat_v2.sim.params import MERCHANT_AI, RUDDER_RATE
 from jenesboat_v2.sim.weapons import Solution, solution
 
-TIME_SCALES = (1, 2, 4, 8)
+TIME_SCALES = (1, 2, 4, 8, 16, 32)
 ZOOM_LEVELS = (2.0, 5.0, 10.0, 20.0, 40.0)  # metres per pixel
 DEFAULT_ZOOM = 3  # index: 20 m/px, about 19 km across a 960 px window
 MAX_SUBSTEP = 0.1  # s of sim time per physics step
@@ -64,7 +64,7 @@ class Game:
         self.zoom_index = DEFAULT_ZOOM
         self.messages: list[tuple[float, str]] = []
         self.restarts = 0
-        self.show_legend = True  # on until the player hides it with L
+        self.show_legend = False  # off until the player asks for it with L
         self.paused = False
         self.confirming_restart = False  # the 'restart? Y/N' prompt is up; the world is frozen
         self.selected: str | None = None  # ship id chosen with T, else the nearest contact
