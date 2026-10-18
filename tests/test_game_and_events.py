@@ -107,6 +107,8 @@ def test_restart_makes_a_new_hunt(captured):
     assert game.messages[1][1].startswith("BdU:")
     game.apply(Controls(fire=True), 0.1)
     game.apply(Controls(restart=True), 0.1)
+    assert game.restarts == 0 and game.confirming_restart  # asked first
+    game.apply(Controls(confirm=True), 0.1)
     assert game.world is not first
     assert game.seed == 6 and game.restarts == 1
     assert game.world.player.tubes.loaded == 4
@@ -149,6 +151,17 @@ def test_describe_covers_every_player_facing_event():
         "mission over (all merchants sunk): 1 sunk (4,500 GRT), 0 got away"
     )
     assert describe("state", {}) is None
+    assert describe("escort_alarm", {"by": "destroyer-1", "reason": "sonar"}) == (
+        "ESCORT: destroyer-1 pinged us"
+    )
+    assert "hunting" in describe("escort_split", {"hunters": ["d1"], "screens": ["d2"]})
+    assert "back to formation" in describe("escort_stand_down", {})
+    assert "depth charge run" in describe("depth_charge_run", {"ship": "d1", "charges": 20})
+    assert describe("depth_charge", {"damage": 0.0}) is None
+    assert describe("depth_charge", {"damage": 0.2}) == "DEPTH CHARGE close!"
+    assert describe("damage", {"level": 0.37, "destroyed": False}) == "hull damage 37%"
+    bonus = describe("sunk", {"ship": "d", "kind": "military", "tonnage": 1800})
+    assert bonus == "d SUNK: escort bonus 1,800 GRT"
 
 
 def test_snapshot_is_json_serialisable():
@@ -174,6 +187,7 @@ def test_pause_freezes_the_world_but_not_the_view(captured):
     assert game.world.time == pytest.approx(t + 0.5)
     game.apply(Controls(pause=True), 0.1)
     game.apply(Controls(restart=True), 0.1)
+    game.apply(Controls(confirm=True), 0.1)
     assert not game.paused  # a new hunt starts running
 
 
@@ -201,3 +215,27 @@ def test_target_selection_cycles_and_persists(captured):
     game.world.player.speed = 6.0 * 0.514444
     game.update(0.1)
     assert game.next_target() is None and game.target() is None
+
+
+def test_restart_asks_first_and_freezes_the_world(captured):
+    game = Game(seed=5, state_interval=float("inf"))
+    game.apply(Controls(restart=True), 0.1)
+    t = game.world.time
+    game.update(1.0)
+    assert game.confirming_restart and game.world.time == t
+    game.apply(Controls(throttle_up=True, fire=True), 0.1)  # other orders wait
+    assert game.world.player.throttle == 0.0 and game.world.torpedoes == []
+    game.apply(Controls(cancel=True), 0.1)
+    assert not game.confirming_restart and game.restarts == 0 and game.seed == 5
+    game.update(1.0)
+    assert game.world.time > t
+    game.apply(Controls(restart=True), 0.1)
+    game.apply(Controls(restart=True), 0.1)  # R again confirms
+    assert game.restarts == 1 and not game.confirming_restart
+
+
+def test_restart_needs_no_confirmation_once_the_hunt_is_over(captured):
+    game = Game(seed=5, state_interval=float("inf"))
+    game.world.mission_over = True
+    game.apply(Controls(restart=True), 0.1)
+    assert game.restarts == 1

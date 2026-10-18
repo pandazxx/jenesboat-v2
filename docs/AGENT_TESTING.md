@@ -121,7 +121,7 @@ and summary as the `agent-smoke-<name>` artifact.
 | 1-4   | time compression x1 / x2 / x4 / x8                       |
 | P     | pause / resume                                           |
 | L     | show / hide the symbol legend (on at the start)          |
-| R     | new hunt (new seed)                                      |
+| R     | new hunt (new seed); asks first, Y/R confirms, N cancels |
 
 Playwright key names for `--keys`: letters as is, `Space`, `Minus`, `Equal`, `Digit4`.
 

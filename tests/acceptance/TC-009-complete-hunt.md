@@ -30,7 +30,8 @@ Fresh hunt (`R`), x8 time (`4`), zoomed out (`-` twice).
 - When every merchant is sunk or has got away (more than 20 km from the boat or off the map,
   whether or not it ever saw you), or the torpedoes are gone, the banner
   `HUNT OVER (<reason>): N sunk, N GRT, N got away - R for a new hunt` appears and `R` starts
-  a new, different hunt (the seed at the bottom right changes).
+  a new, different hunt (the seed at the bottom right changes). Pressing `R` mid-hunt first
+  asks `Y / R: yes  N: no` and freezes the world until you answer.
 - Challenge check (acceptance criterion): with the approach above a hit is normal; being seen
   during the approach means losing the group.
 

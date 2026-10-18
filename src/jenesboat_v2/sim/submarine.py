@@ -21,6 +21,11 @@ class Submarine(Vessel):
     battery: float = 1.0  # 0 (flat) .. 1 (full)
     tubes: Tubes = field(default_factory=Tubes)
     fired: int = 0
+    damage: float = 0.0  # 0 (sound) .. 1 (lost), from depth charges; never repaired
+
+    @property
+    def destroyed(self) -> bool:
+        return self.damage >= 1.0
 
     # --- depth -----------------------------------------------------------------------------
 
@@ -128,6 +133,7 @@ class Submarine(Vessel):
         data["battery"] = round(self.battery, 3)
         data["tubes"] = self.tubes.snapshot()
         data["can_fire"] = self.can_fire
+        data["damage"] = round(self.damage, 2)
         return data
 
 

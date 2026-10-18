@@ -27,7 +27,7 @@ ship does not turn and a ship going astern turns the other way.
 | Type VIIC submerged | 7.6 kn | same | same | same | same | electric motors, see below |
 | freighter | 11 kn (cruise 8) | 0.08 | 350 m | 2.0 | 120 x 16 m | 4,500 GRT, 1 torpedo |
 | tanker | 10 kn (cruise 8) | 0.06 | 450 m | 1.5 | 160 x 21 m | 9,000 GRT, 2 torpedoes |
-| destroyer | 32 kn (cruise 12) | 0.50 | 250 m | 6.0 | 100 x 10 m | out of scope until M2 |
+| destroyer | 32 kn (cruise 12) | 0.50 | 250 m | 6.0 | 100 x 10 m | escort, M2: 1,800 GRT bonus, 1 torpedo |
 
 Sources are the usual Type VIIC figures (17.7 / 7.6 kn) and typical WWII tramp steamers and
 tankers (8 kn convoy speed, 10-11 kn flat out). Turn radii are a little tighter than reality so
@@ -85,3 +85,63 @@ night is a later milestone). A ship reacts only after the boat has stayed in ran
 | spread | 20° between neighbours | a group fans out instead of running in a line |
 | escape range | 20 km | a merchant this far from the boat (or off the map) has got away, alerted or not: the hunt area |
 | panic range | 6 km | a torpedo hit alerts every merchant within this distance |
+
+## Destroyer escort (M2: `SonarParams`, `DepthChargeParams`, `EscortAIParams`)
+
+The scenario sends two destroyers (`ESCORTS` in `scenario.py`) with the three merchants; they
+start on their formation stations, 1.2 km ahead of the group and 1.5 km off either flank.
+Lookouts use the ordinary detection table (`lookout` 1.5 makes a surfaced boat visible at
+9 km, a periscope at 1.5 km).
+
+**Active sonar** (`SONAR_ASDIC`). Each destroyer pings every 5 s. The echo range is 3,000 m
+multiplied by:
+
+| factor | value | why |
+| --- | --- | --- |
+| other ships within 2.5 km (the fleet itself) | -12 % each, never below 40 % | the convoy's screws and wakes mask the echo: this is the "interfered by the fleet" rule, so a boat lurking at the edge of the convoy is hard to find and one outside it is not |
+| destroyer faster than 15 kn | x 0.4 | its own screws deafen the set; hunters slow to 14 kn inside 1.5 km |
+| boat at or below 2.5 kn | x 0.7 | a creeping boat makes less noise |
+
+The echo is lost inside 150 m (the attacker runs over the boat on its last fix). A fix has a
++-40 m error per axis. The boat's depth is not measured.
+
+**Tracking.** Every sonar fix or sighting goes into a 45 s window; a least-squares line through
+it gives the escorts the boat's position now (the +-40 m noise of single fixes averages out)
+and its course and speed (needs three fixes over at least 10 s, capped at 7.6 kn). A torpedo hit
+gives a rough position and no course. The prediction is carried at most 90 s past the last fix.
+
+**Depth charges** (`DEPTH_CHARGE`). Projectors throw a charge up to 150 m from the ship, so a
+destroyer does not have to cross the boat's path: a run starts as soon as the predicted
+position of the boat (10 s ahead, about how long the first charge takes to sink) is within
+150 m, and hunters steer for the predicted position rather than the last fix. A run is 6
+charges 1 s apart. Each is aimed where the boat will be when that charge has sunk to its depth
+(the predicted path), up to 15 m to either side of it, and set deeper than the one before, in
+layers from 25 m above to 25 m below the estimated depth (never shallower than 15 m).
+A charge whose aim point is beyond 150 m is not thrown. Charges sink at 3 m/s. A burst within
+12 m of the boat breaks it; out to 45 m it does up to 40 % hull damage, falling off linearly,
+in 3D (depth counts). Damage accumulates and is never repaired; the boat is lost at 100 %.
+45 s between runs; 40 charges per ship. Rough odds against a boat that holds a steady course or
+sits still for about 3 minutes after being found: half are lost when deep, all at periscope
+depth. Circling does not help (the prediction stays on the circle's area); what helps is
+leaving the area quietly and changing course, so the track is lost.
+
+**Escort AI** (`ESCORT_AI`, code in `sim/escort.py`):
+
+| state | behaviour |
+| --- | --- |
+| formation | hold the station relative to the merchants' centre and route, at the convoy's speed |
+| alarm | a sonar fix, a lookout sighting or a torpedo hit sets the group's *datum* (where the boat is). The convoy is told (merchants within 8 km run) |
+| split | the escorts nearest the datum hunt (`hunters_per_escort` = 1 hunter per 3 escorts, 1 to 2); the rest screen. A lost hunter is replaced from the screens |
+| hunt | steer for the predicted position of the boat, 20 kn, slow to 14 kn inside 1.5 km, throw a pattern from up to 150 m away. Without a fix younger than 60 s sweep a square around the datum that widens by 1 m/s (400 m to 2.5 km) |
+| screen | stand 2 km from the convoy centre toward the datum, 700 m apart, facing the threat |
+| stand down | no fix or sighting for 300 s: everyone returns to formation |
+| merchants | an alerted merchant that is nearer the threat than the nearest non-hunting escort slips in behind it (the point 700 m behind it, never steering more than 90° from directly away from the boat); one already behind the escort keeps running away. With no escort it just runs away (M1 rule) |
+
+A torpedo hit gives only a rough datum (2 km back along the torpedo's track) and never replaces
+a fix younger than 30 s.
+
+**Scoring.** Only merchants count for the hunt (`SUNK ... GRT`, the end banner, mission end).
+Sinking a destroyer (1 torpedo, 1,800 GRT) adds to the separate escort bonus shown as
+`(+N escort)`. Destroyers never "escape". The hunt also ends when the boat is lost
+(`boat_lost`).
+

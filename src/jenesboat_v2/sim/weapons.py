@@ -3,10 +3,11 @@ fire-control geometry the HUD uses to show the lead."""
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 from jenesboat_v2.sim.geo import project, ray_line_crossing
-from jenesboat_v2.sim.params import G7E, TorpedoParams
+from jenesboat_v2.sim.params import DEPTH_CHARGE, G7E, DepthChargeParams, TorpedoParams
 
 
 @dataclass
@@ -145,3 +146,43 @@ def solution(
     cx, cy = project(sx, sy, s_heading, run)
     px, py = project(tx, ty, t_heading, travel)
     return Solution(cx, cy, run, time, px, py, along - travel)
+
+
+@dataclass
+class DepthCharge:
+    """Dropped from a destroyer, sinks at a fixed rate and bursts at its set depth."""
+
+    charge_id: int
+    x: float
+    y: float
+    set_depth: float
+    params: DepthChargeParams = DEPTH_CHARGE
+    depth: float = 0.0
+    burst: bool = False
+
+    def step(self, dt: float) -> bool:
+        """Sink; ``True`` on the step it reaches its depth and bursts."""
+        self.depth = min(self.set_depth, self.depth + self.params.sink_rate * dt)
+        if self.depth >= self.set_depth - 1e-9:
+            self.burst = True
+        return self.burst
+
+    def effect_on(self, x: float, y: float, depth: float) -> float:
+        """Hull damage (0..1) a burst here does to a boat at (x, y, depth); 1 inside the lethal
+        radius, falling off linearly to nothing at the damage radius."""
+        d = math.sqrt((x - self.x) ** 2 + (y - self.y) ** 2 + (depth - self.set_depth) ** 2)
+        if d <= self.params.lethal_radius:
+            return 1.0
+        if d >= self.params.damage_radius:
+            return 0.0
+        span = self.params.damage_radius - self.params.lethal_radius
+        return self.params.damage * (1.0 - (d - self.params.lethal_radius) / span)
+
+    def snapshot(self) -> dict:
+        return {
+            "id": self.charge_id,
+            "x": round(self.x, 1),
+            "y": round(self.y, 1),
+            "depth": round(self.depth, 1),
+            "set_depth": round(self.set_depth, 1),
+        }

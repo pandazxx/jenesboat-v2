@@ -34,7 +34,7 @@ def test_headless_script_moves_and_dives(capsys):
     assert final["player"]["speed_kn"] > 5.0
     assert final["player"]["rudder"] == 1.0
     assert final["player"]["depth"] > 0.0
-    assert len(final["ships"]) == 3
+    assert len(final["ships"]) == 5
 
 
 def test_headless_telegraph_order(capsys):

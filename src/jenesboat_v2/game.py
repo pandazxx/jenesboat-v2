@@ -43,7 +43,9 @@ class Controls:
     next_target: bool = False  # select the next contact
     legend: bool = False  # toggle the symbol legend
     pause: bool = False  # toggle pause
-    restart: bool = False
+    restart: bool = False  # R: asks first unless the hunt is over; R or Y again confirms
+    confirm: bool = False  # Y
+    cancel: bool = False  # N
 
 
 class Game:
@@ -64,6 +66,7 @@ class Game:
         self.restarts = 0
         self.show_legend = True  # on until the player hides it with L
         self.paused = False
+        self.confirming_restart = False  # the 'restart? Y/N' prompt is up; the world is frozen
         self.selected: str | None = None  # ship id chosen with T, else the nearest contact
         self.messages.append((0.0, objective(self.world)))
         self._drain()
@@ -71,8 +74,17 @@ class Game:
     # --- orders ----------------------------------------------------------------------------
 
     def apply(self, controls: Controls, dt: float) -> None:
+        if self.confirming_restart:
+            if controls.confirm or controls.restart:
+                self.restart()
+            elif controls.cancel:
+                self.confirming_restart = False
+            return
         if controls.restart:
-            self.restart()
+            if self.world.mission_over:  # nothing to lose
+                self.restart()
+            else:
+                self.confirming_restart = True
             return
         sub = self.world.player
         if controls.throttle_up:
@@ -125,6 +137,7 @@ class Game:
         self.world = hunting_scenario(self.seed)
         self.messages.clear()
         self.paused = False
+        self.confirming_restart = False
         self.selected = None
         self._since_state = 0.0
         events.emit("restart", seed=self.seed)
@@ -139,7 +152,7 @@ class Game:
 
     def update(self, dt: float) -> None:
         """Advance the game by ``dt`` real seconds (times the time compression)."""
-        if self.paused:
+        if self.paused or self.confirming_restart:
             return
         remaining = dt * self.time_scale
         while remaining > 1e-9:
@@ -221,6 +234,7 @@ class Game:
         data["seed"] = self.seed
         data["time_scale"] = self.time_scale
         data["paused"] = self.paused
+        data["confirming_restart"] = self.confirming_restart
         data["zoom"] = self.zoom
         sol = self.solution()
         data["solution"] = sol.snapshot() if sol else None
@@ -255,9 +269,27 @@ def describe(name: str, data: dict) -> str | None:
     if name == "hit":
         return f"HIT {data['ship']}"
     if name == "sunk":
+        if data.get("kind") == "military":
+            return f"{data['ship']} SUNK: escort bonus {data['tonnage']:,} GRT"
         return f"{data['ship']} SUNK, {data['tonnage']:,} GRT"
     if name == "torpedo_lost":
         return f"torpedo {data['torpedo']} missed"
+    if name == "escort_alarm":
+        how = {"sonar": "pinged us", "sighted": "sighted us", "torpedo": "was torpedoed"}
+        return f"ESCORT: {data['by']} {how.get(data['reason'], data['reason'])}"
+    if name == "escort_split":
+        return (
+            f"escort splits: {', '.join(data['hunters'])} hunting, "
+            f"{', '.join(data['screens']) or 'none'} screening"
+        )
+    if name == "escort_stand_down":
+        return "escort lost the track, back to formation"
+    if name == "depth_charge_run":
+        return f"{data['ship']} is making a depth charge run"
+    if name == "depth_charge" and data["damage"] > 0:
+        return "DEPTH CHARGE close!"
+    if name == "damage":
+        return f"hull damage {data['level'] * 100:.0f}%"
     if name == "escaped":
         return f"{data['ship']} got away"
     if name == "mission_end":
@@ -273,6 +305,6 @@ def objective(world: World) -> str:
     n = len(world.merchants)
     km = MERCHANT_AI.escape_range / 1000
     return (
-        f"Objective: sink the {n} merchants. The hunt ends when all are sunk or "
-        f"more than {km:.0f} km away, or your torpedoes are gone"
+        f"Objective: sink the {n} merchants (a destroyer is a bonus). The hunt ends when all "
+        f"are sunk or more than {km:.0f} km away, your torpedoes are gone, or the boat is lost"
     )
