@@ -188,3 +188,33 @@ def test_restart_prompt_is_drawn():
     base = draw(game)
     game.apply(Controls(restart=True), 0.1)
     assert len(draw(game)) > len(base) - 1 and "draw_rectangle" in draw(game)
+
+
+def test_touch_layout_moves_the_bottom_band_and_centres_the_legend():
+    game = Game(seed=1, state_interval=float("inf"))
+    game.show_legend = True
+    rl = FakeRL()
+    render.draw(rl, game, 976, 450, render.Pad(left=275.0, right=223.0))
+    assert "draw_rectangle" in rl.calls  # the legend panel
+    plain = draw(game)  # 960x540, no pad
+    rl2 = FakeRL()
+    render.draw(rl2, game, 960, 540, render.Pad())  # same band width: only the help line goes
+    assert rl2.calls.count("draw_text") == plain.count("draw_text") - 1
+    game.apply(Controls(restart=True), 0.1)
+    game.show_legend = False
+    render.draw(FakeRL(), game, 976, 450, render.Pad())  # the YES / NO prompt
+    game.apply(Controls(cancel=True), 0.1)
+    game.apply(Controls(pause=True), 0.1)
+    render.draw(FakeRL(), game, 976, 450, render.Pad())  # the RUN to resume banner
+
+
+def test_long_messages_wrap_to_the_band():
+    game = Game(seed=1, state_interval=float("inf"))
+    objective = game.messages[0][1]
+    assert len(objective) > 100  # the objective line is the long one
+    wide = render._wrap(FakeRL(), objective, 16, 10_000)
+    narrow = render._wrap(FakeRL(), objective, 16, 400)
+    assert wide == [objective]
+    assert len(narrow) > 1 and " ".join(narrow) == objective
+    assert all(FakeRL().measure_text(line, 16) <= 400 for line in narrow)
+    assert render._wrap(FakeRL(), "", 16, 100) == []
