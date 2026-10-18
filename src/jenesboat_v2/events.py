@@ -37,10 +37,13 @@ def _browser_console() -> Any:
 
 
 def _stdout_sink(line: str) -> None:
-    print(line, flush=True, file=sys.stdout)
     console = _browser_console()
     if console is not None:
+        # Only the JS console: on a phone pygbag has no in-page terminal and routes stdout to
+        # the console too, so printing as well would show every event twice.
         console.log(line)
+    else:
+        print(line, flush=True, file=sys.stdout)
 
 
 _sink: Sink = _stdout_sink

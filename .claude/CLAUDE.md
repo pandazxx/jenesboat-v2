@@ -14,7 +14,10 @@ propeller speed, weapons, and ship AI strategies). Art style: simple lines/boxes
 - Run `just lint` and `just test` before every commit.
 - Work on a topic branch, push, and open a PR against `master`; never commit to `master`.
 - Keep game logic (physics, ship AI, visibility) separate from rendering so it is unit-testable
-  without a window: `sim/` and `game.py` never import pyray; only `render.py`/`app.py` do.
+  without a window: `sim/`, `game.py` and `touch.py` never import pyray; only `render.py`/`app.py` do.
+- The web page (`web/noctx.tmpl`) owns the canvas size and the touch buttons; the game draws in
+  logical px (`app.logical_size`) and polls the buttons through `touch.py` (one bit per key,
+  the page's `JB_KEYS` must match `touch.KEYS`).
 - Every tunable number lives in `sim/params.py` and is explained in `docs/PARAMETERS.md`;
   balance changes edit those, not the modules that use them.
 - The browser runtime (pygbag) is CPython 3.12: keep the package 3.12-compatible.

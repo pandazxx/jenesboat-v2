@@ -15,10 +15,13 @@ Open the build URL in a desktop browser (Chrome, Firefox or Safari), any window 
 
 ## Expected
 
-- The game fills the largest 16:9 box that fits the window and is centred both ways, with the
-  dark ocean colour around it; it is never pinned to a corner and never cut off.
+- The game spans the full width of the window. A window wider than 16:9 is filled completely
+  (more map left and right, the HUD text the same size as in a 16:9 window); a window taller
+  than 16:9 shows a band of ocean colour above and below the 16:9 game. It is never pinned to
+  a corner, never cut off and nothing looks stretched (grid squares stay square).
 - Resizing keeps it centred and rescaled; the HUD text scales with the box and stays readable.
 - Keys still work after clicking anywhere on the game.
+- No on-screen buttons appear on a desktop with a mouse (see TC-019 for touch screens).
 
 - On a high-DPI (Retina) screen the game still fills the whole box: it is not drawn small in
   the bottom-left quarter.

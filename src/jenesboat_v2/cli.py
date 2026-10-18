@@ -29,13 +29,30 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--trace", action="store_true", help="headless: emit a state event every second")
     p.add_argument("--seed", type=int, default=None, help="scenario seed (random if omitted)")
     p.add_argument(
+        "--size",
+        default=None,
+        metavar="WxH",
+        help="windowed: window size in px, e.g. 976x450 (a phone held sideways)",
+    )
+    p.add_argument(
+        "--touch",
+        action="store_true",
+        help="windowed: lay the HUD out as on a touch screen (between the button clusters)",
+    )
+    p.add_argument(
+        "--screenshot",
+        default=None,
+        metavar="FILE",
+        help="windowed: save a PNG after 2 s of game time and quit (needs a display)",
+    )
+    p.add_argument(
         "--script",
         default=None,
         help=(
             "headless: JSON list of timed orders, e.g. "
             '\'[{"t":0,"throttle":1},{"t":5,"rudder":1},{"t":8,"dive":true}]\'. '
             "Keys: throttle (-1..1) or telegraph ('ahead half', ...), rudder (-1..1), "
-            "dive (toggle), deep, target_depth (m), fire, time_scale (1, 2, 4 or 8), "
+            "dive (toggle), deep, target_depth (m), fire, time_scale (1, 2, 4, 8, 16 or 32), "
             "pause (toggle), target (ship id, or null for automatic), next_target."
         ),
     )
@@ -97,8 +114,23 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
     from jenesboat_v2.app import main as app_main
 
-    app_main(seed=args.seed)
+    app_main(
+        seed=args.seed,
+        size=parse_size(args.size),
+        touch_layout=args.touch,
+        screenshot=args.screenshot,
+    )
     return 0
+
+
+def parse_size(text: str | None) -> tuple[int, int] | None:
+    """``"976x450"`` -> ``(976, 450)``; ``None`` stays ``None``."""
+    if text is None:
+        return None
+    w, sep, h = text.lower().partition("x")
+    if not sep or not w.isdigit() or not h.isdigit() or int(w) < 1 or int(h) < 1:
+        raise SystemExit(f"--size must look like 960x540, not {text!r}")
+    return int(w), int(h)
 
 
 def entrypoint() -> int:

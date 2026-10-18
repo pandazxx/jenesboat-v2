@@ -23,7 +23,7 @@ just sim --seconds 30 --trace --seed 7 \
 compression. Order keys: `throttle` (-1..1) or `telegraph` (`"ahead half"`, `"stop"`, ...),
 `rudder` (-1..1, +1 = 35° starboard, stays until the next order), `dive` (Space: one band
 shallower, or periscope depth from the surface), `deep` (C), `target_depth` (metres), `fire`
-(F), `time_scale` (1, 2, 4 or 8), `target` (a ship id, or `null` for automatic), `next_target`,
+(F), `time_scale` (1, 2, 4, 8, 16 or 32), `target` (a ship id, or `null` for automatic), `next_target`,
 `pause` (toggle; the headless clock keeps running but the world
 does not, so a paused stretch shortens the simulated time).
 
@@ -92,6 +92,35 @@ On failure the summary contains the console tail and page errors. Look at the sc
 judge rendering (ocean grid in km, yellow submarine dot with its red visibility circle, HUD;
 grey merchant boxes only once they are in sight).
 
+`--mobile` emulates an iPhone 16 held sideways (852x393 CSS px, 3x pixels, touch screen):
+the page shows the on-screen buttons and `--taps "W,W,W,W,D:2,SPACE"` touches them (a
+button name from `web/noctx.tmpl`, `:seconds` to hold it). The summary then also has
+`touch_overlay` (the buttons are shown), `viewport` (the game's logical size, e.g.
+`976x450` for that phone) and `touch_inputs` (the presses the game logged with
+`"source":"touch"`); `taps_ok` and the exit code require every logged tap to have arrived.
+CI runs this as a second step and keeps `web-mobile.png` / `web-mobile.json` next to the
+desktop pair in the same artifact.
+
+```sh
+just agent-web-test https://pandazxx.github.io/jenesboat-v2/builds/<name>/ \
+  --mobile --keys "" --taps "W,W,W,W,D:2" --screenshot dist/agent/web-mobile.png
+```
+
+### Native window screenshots (layout checks)
+
+The native build can draw one frame and quit, which is the quickest way to look at the HUD
+at a given size without a browser (needs a display; in a container start `Xvfb :99` and set
+`DISPLAY=:99`):
+
+```sh
+uv run jenesboat-v2 --seed 7 --size 976x450 --touch --screenshot dist/shots/phone.png
+```
+
+`--size WxH` is the window size (976x450 is what an iPhone 16 gets in logical px),
+`--touch` lays the HUD out as on a touch screen (message log between the button zones, no
+keyboard help line, legend centred) and `--screenshot FILE` saves the frame after 2 s of
+game time. The `screenshot` event confirms the path and the logical size used.
+
 To test a local build instead of a deployed one:
 
 ```sh
@@ -118,12 +147,14 @@ and summary as the `agent-smoke-<name>` artifact.
 | F     | fire a torpedo along the heading                         |
 | T     | next target (cycles through the contacts; otherwise the nearest is the target) |
 | - / = | zoom out / in                                            |
-| 1-4   | time compression x1 / x2 / x4 / x8                       |
+| 1-6   | time compression x1 / x2 / x4 / x8 / x16 / x32           |
 | P     | pause / resume                                           |
-| L     | show / hide the symbol legend (on at the start)          |
+| L     | show / hide the symbol legend (off at the start)         |
 | R     | new hunt (new seed); asks first, Y/R confirms, N cancels |
 
 Playwright key names for `--keys`: letters as is, `Space`, `Minus`, `Equal`, `Digit4`.
+Touch button names for `--taps`: `W S A D Q SPACE C F T MINUS EQUAL P L R Y N TIME`
+(`TIME` cycles the time compression; `A` / `D` act while held, so give them seconds).
 
 ## Container image
 

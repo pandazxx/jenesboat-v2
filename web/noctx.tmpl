@@ -200,10 +200,12 @@ config = {
     <title>{{cookiecutter.title}}</title>
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="viewport" content="height=device-height, initial-scale=1.0">
+    <!-- jenesboat: one viewport rule; viewport-fit=cover lets the canvas run under a phone's
+         notch, the buttons keep clear of it with env(safe-area-inset-*). -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes"/>
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 
 
     <link rel="icon" type="image/png" href="favicon.png" sizes="16x16">
@@ -227,13 +229,18 @@ config = {
         div.emscripten_border { border: 1px solid black; }
         div.thick_border { border: 4px solid black; }
 
-        /* jenesboat: the game owns the canvas layout (config.user_canvas = 1).  The canvas is
-           centred in the viewport and scaled to the largest 16:9 box that fits; !important
-           beats the inline styles the pygbag runtime and SDL may set.  The game is keyboard
-           only, so CSS scaling does not upset any mouse coordinates. */
+        /* jenesboat: the game owns the canvas layout (config.user_canvas = 1).  The canvas
+           spans the full width of the window and as much height as keeps it at least 16:9
+           (a 19.5:9 phone held sideways fills the whole screen; a 4:3 window gets a band of
+           ocean colour above and below).  The game reads the resulting CSS size every frame
+           and draws at a matching logical resolution, so nothing is stretched.  !important
+           beats the inline styles the pygbag runtime and SDL may set.  Pointer input is not
+           used on the canvas (keys and the HTML buttons below), so scaling is harmless. */
         html, body {
             height: 100%;
             overflow: hidden;
+            touch-action: none;
+            overscroll-behavior: none;
         }
 
         canvas.emscripten {
@@ -243,13 +250,110 @@ config = {
             padding: 0 !important;
             margin: 0 !important;
             position: fixed !important;
-            left: 50% !important;
+            left: 0 !important;
             top: 50% !important;
             right: auto !important;
             bottom: auto !important;
-            transform: translate(-50%, -50%);
-            width: min(100vw, calc(100vh * 16 / 9)) !important;
+            transform: translateY(-50%);
+            width: 100vw !important;
             height: min(100vh, calc(100vw * 9 / 16)) !important;
+            height: min(100dvh, calc(100vw * 9 / 16)) !important;
+            touch-action: none;
+        }
+
+        /* jenesboat: on-screen buttons for touch screens.  body.touch shows them; the game
+           polls window.jb_held / window.jb_taps (see the script at the end of the page). */
+        #touch {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 20;
+            pointer-events: none;
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+        }
+        body.touch #touch { display: block; }
+        #touch .cluster {
+            position: absolute;
+            display: grid;
+            gap: 6px;
+        }
+        #touch button {
+            pointer-events: auto;
+            touch-action: none;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+            -webkit-tap-highlight-color: transparent;
+            min-width: 56px;
+            height: 46px;
+            padding: 0 8px;
+            border: 1px solid rgba(150, 160, 170, 0.7);
+            border-radius: 8px;
+            background: rgba(6, 18, 36, 0.55);
+            color: #e6e6e6;
+            font: 600 14px/1 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+            letter-spacing: 0.02em;
+        }
+        #touch button.on, #touch button:active {
+            background: rgba(230, 190, 110, 0.55);
+            color: #061224;
+        }
+        #touch button.hold { border-style: double; }
+        /* Telegraph in a column at the left (AHEAD over ASTERN), rudder in a row along the
+           bottom (PORT, MID, STBD). */
+        #pad-ship {
+            left: max(10px, env(safe-area-inset-left));
+            bottom: max(10px, env(safe-area-inset-bottom));
+            grid-template-columns: repeat(4, auto);
+            grid-template-rows: repeat(2, auto);
+        }
+        #pad-ship [data-key="W"] { grid-column: 1; grid-row: 1; }
+        #pad-ship [data-key="S"] { grid-column: 1; grid-row: 2; }
+        #pad-ship [data-key="A"] { grid-column: 2; grid-row: 2; }
+        #pad-ship [data-key="Q"] { grid-column: 3; grid-row: 2; }
+        #pad-ship [data-key="D"] { grid-column: 4; grid-row: 2; }
+        #pad-attack {
+            right: max(10px, env(safe-area-inset-right));
+            bottom: max(10px, env(safe-area-inset-bottom));
+            grid-template-columns: repeat(2, 1fr);
+        }
+        #pad-meta {
+            left: max(10px, env(safe-area-inset-left));
+            top: 26vh;
+            grid-auto-flow: column;
+        }
+        #pad-meta button { min-width: 44px; height: 38px; font-size: 13px; }
+        #touch #pad-confirm {
+            display: none;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, 10px);
+            grid-auto-flow: column;
+            gap: 24px;
+        }
+        #pad-confirm button { min-width: 96px; }
+        #touch.confirm #pad-confirm { display: grid; }
+        #touch.confirm .cluster:not(#pad-confirm) { visibility: hidden; }
+
+        /* jenesboat: the HUD only fits a landscape screen. */
+        #rotate {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 30;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 24px;
+            background: #061224;
+            color: #e6e6e6;
+            font: 20px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        }
+        @media (orientation: portrait) and (pointer: coarse) and (max-width: 900px) {
+            #rotate { display: flex; }
         }
 
         body {
@@ -323,6 +427,36 @@ height="1px"
     </canvas>
 
     <div id=html></div>
+
+    <!-- jenesboat: touch controls (shown on touch screens by the script at the end). -->
+    <div id="touch">
+        <div class="cluster" id="pad-ship">
+            <button data-key="W">AHEAD</button>
+            <button data-key="S">ASTERN</button>
+            <button data-key="A" class="hold">&#9664; PORT</button>
+            <button data-key="Q">MID</button>
+            <button data-key="D" class="hold">STBD &#9654;</button>
+        </div>
+        <div class="cluster" id="pad-attack">
+            <button data-key="SPACE">DIVE</button>
+            <button data-key="C">DEEP</button>
+            <button data-key="F">FIRE</button>
+            <button data-key="T">TGT</button>
+        </div>
+        <div class="cluster" id="pad-meta">
+            <button data-key="P" id="jb-pause">PAUSE</button>
+            <button data-key="TIME" id="jb-time">x1</button>
+            <button data-key="MINUS">&minus;</button>
+            <button data-key="EQUAL">+</button>
+            <button data-key="L">?</button>
+            <button data-key="R">NEW</button>
+        </div>
+        <div class="cluster" id="pad-confirm">
+            <button data-key="Y">YES</button>
+            <button data-key="N">NO</button>
+        </div>
+    </div>
+    <div id="rotate">Turn your phone sideways<br>jenesboat is played in landscape</div>
 
     <div id=crt  class=bottomright >
 
@@ -433,6 +567,84 @@ frameborder="1"
     function frame_online(url) {
         window.frames["iframe"].location = url;
     }
+
+    // ---- jenesboat touch controls --------------------------------------------------------
+    // One bit per button, in the order of jenesboat_v2/touch.py KEYS (tests check they
+    // match).  jb_held: buttons down right now; jb_taps: buttons pressed since the game
+    // last called jb_ack().  jb_pad_left / jb_pad_right: CSS px the clusters take at the
+    // left and right edges, so the HUD can keep clear of them.  jb_show(...) is called by
+    // the game when the prompt, pause state, time compression or legend changes; jb_fit(w, h)
+    // when it wants the canvas buffer resized.
+    (function () {
+        const JB_KEYS = ["W", "S", "A", "D", "Q", "SPACE", "C", "F", "T", "MINUS", "EQUAL",
+                         "P", "L", "R", "Y", "N", "TIME"];
+        const HOLD = new Set(["A", "D"]);
+        const bit = {};
+        JB_KEYS.forEach((k, i) => { bit[k] = 1 << i; });
+        const pad = document.getElementById("touch");
+        const ship = document.getElementById("pad-ship");
+        const attack = document.getElementById("pad-attack");
+
+        window.jb_touch = 0;
+        window.jb_held = 0;
+        window.jb_taps = 0;
+        window.jb_pad_left = 0;
+        window.jb_pad_right = 0;
+        window.jb_ack = function () { window.jb_taps = 0; };
+        // The game asks for a GL buffer of CSS size x devicePixelRatio, so text is sharp on
+        // a phone (the runtime leaves the buffer at the CSS size).
+        window.jb_fit = function (w, h) {
+            const c = document.getElementById("canvas");
+            if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+            return true;
+        };
+        window.jb_show = function (confirming, paused, timeScale, legend) {
+            pad.classList.toggle("confirm", !!confirming);
+            document.getElementById("jb-pause").textContent = paused ? "RUN" : "PAUSE";
+            document.getElementById("jb-time").textContent = "x" + timeScale;
+            return true;
+        };
+
+        function measure() {
+            const w = window.innerWidth;
+            window.jb_pad_left = window.jb_touch ? ship.getBoundingClientRect().right : 0;
+            window.jb_pad_right = window.jb_touch ? w - attack.getBoundingClientRect().left : 0;
+        }
+
+        function enable() {
+            if (window.jb_touch) return;
+            window.jb_touch = 1;
+            document.body.classList.add("touch");
+            measure();
+        }
+
+        const coarse = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+        if (coarse || navigator.maxTouchPoints > 0) enable();
+        window.addEventListener("touchstart", enable, { passive: true, once: true });
+        window.addEventListener("resize", measure);
+        window.addEventListener("orientationchange", () => setTimeout(measure, 100));
+
+        function down(e) {
+            const key = e.currentTarget.dataset.key;
+            e.preventDefault();
+            try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) {}
+            e.currentTarget.classList.add("on");
+            window.jb_taps |= bit[key];
+            if (HOLD.has(key)) window.jb_held |= bit[key];
+        }
+        function up(e) {
+            const key = e.currentTarget.dataset.key;
+            e.currentTarget.classList.remove("on");
+            window.jb_held &= ~bit[key];
+        }
+        pad.querySelectorAll("button[data-key]").forEach((b) => {
+            b.addEventListener("pointerdown", down);
+            b.addEventListener("pointerup", up);
+            b.addEventListener("pointercancel", up);
+            b.addEventListener("lostpointercapture", up);
+            b.addEventListener("contextmenu", (e) => e.preventDefault());
+        });
+    })();
 
     </script>
 

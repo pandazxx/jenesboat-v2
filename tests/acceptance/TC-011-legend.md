@@ -6,12 +6,12 @@ added_in: 15
 ---
 ## Preconditions
 
-Fresh hunt (`R`).
+Fresh hunt (`R`); no legend is shown.
 
 ## Steps
 
-1. Read the panel in the lower right.
-2. Press `L`; press `L` again.
+1. Press `L` and read the panel in the lower right.
+2. Press `L` again; press `L` once more.
 3. Get a visual contact and a firing solution (see TC-005) and compare the orange markers with
    the legend.
 
@@ -22,11 +22,12 @@ Fresh hunt (`R`).
   and bearings, the target's projected course, the torpedo track, the crossing ring, the
   target-at-impact dot, the miss-distance line (green = fire), running torpedoes, and the
   intel / last-seen marker.
-- `L` hides it (the build tag and messages stay) and shows it again.
+- The legend is not up at the start; `L` shows it, hides it (the build tag and messages
+  stay) and shows it again.
 - The orange ring sits where the faint torpedo line crosses the dashed target course, the
   orange dot sits on the dashed course where the target will be when the torpedo arrives, and
   the line between them shrinks to nothing and turns green as the solution comes good.
 
 ## Automated
 
-`tests/test_render.py::test_legend_is_on_by_default_and_l_toggles_it`.
+`tests/test_render.py::test_legend_is_off_by_default_and_l_toggles_it`.

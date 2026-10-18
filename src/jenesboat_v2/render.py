@@ -8,6 +8,7 @@ helper (aiming line, crossing point and lead marker) for the selected target.
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 
 from jenesboat_v2._build_info import BUILD_ID
 from jenesboat_v2.game import Game
@@ -56,6 +57,16 @@ def _color(rl, rgba):
     return rl.Color(*rgba)
 
 
+@dataclass(frozen=True)
+class Pad:
+    """Touch controls are on screen: the lower part of the left and right edges is covered
+    by button clusters this wide (logical px), so the message log, scale bar and build tag
+    go between them, the keyboard help line goes, and the legend sits in the middle."""
+
+    left: float = 0.0
+    right: float = 0.0
+
+
 class Camera:
     def __init__(self, cx: float, cy: float, zoom: float, width: int, height: int) -> None:
         self.cx, self.cy, self.zoom, self.width, self.height = cx, cy, zoom, width, height
@@ -69,7 +80,8 @@ class Camera:
         return metres / self.zoom
 
 
-def draw(rl, game: Game, width: int, height: int) -> None:
+def draw(rl, game: Game, width: int, height: int, pad: Pad | None = None) -> None:
+    """One frame in ``width`` x ``height`` logical px; ``pad`` when touch buttons are up."""
     world = game.world
     sub = world.player
     cam = Camera(sub.x, sub.y, game.zoom, width, height)
@@ -113,9 +125,9 @@ def draw(rl, game: Game, width: int, height: int) -> None:
 
     _draw_fire_control(rl, cam, game)
     _draw_sub(rl, cam, game)
-    _draw_hud(rl, game, width, height)
+    _draw_hud(rl, game, width, height, pad)
     if game.show_legend:
-        _draw_legend(rl, width, height)
+        _draw_legend(rl, width, height, pad)
     rl.end_drawing()
 
 
@@ -303,7 +315,7 @@ def _draw_sub(rl, cam: Camera, game: Game) -> None:
         rl.draw_circle_lines(int(sx), int(sy), cam.px(seen), _color(rl, BUBBLE))
 
 
-def _draw_hud(rl, game: Game, width: int, height: int) -> None:
+def _draw_hud(rl, game: Game, width: int, height: int, pad: Pad | None) -> None:
     world = game.world
     sub = world.player
     tubes = sub.tubes
@@ -339,47 +351,69 @@ def _draw_hud(rl, game: Game, width: int, height: int) -> None:
 
     _draw_contact_panel(rl, game, width)
 
-    y = height - 26 - 18 * (len(game.messages) + 1)
-    for t, text in game.messages:
-        rl.draw_text(f"{t / 60:5.1f}m  {text}", 10, y, 16, _color(rl, HUD_DIM))
-        y += 18
-    help_line = (
-        "W/S telegraph  A/D rudder  Q midships  SPACE dive  C deep  F fire  T target  "
-        "-/= zoom  1-4 time  P pause  L legend"
-    )
-    rl.draw_text(
-        help_line,
-        10,
-        height - 26,
-        16,
-        _color(rl, HUD_DIM),
-    )
+    # The bottom band: messages above the scale bar and build tag.  With touch buttons up
+    # it sits between the two clusters and there is no keyboard help line.
+    left = 10 if pad is None else int(pad.left) + 10
+    right = width - 10 if pad is None else width - int(pad.right) - 10
+    bottom = height - 26 if pad is None else height - 8
+    text_right = right - LEGEND_WIDTH - 10 if pad is None and game.show_legend else right
+    rows = [
+        _wrap(rl, f"{t / 60:5.1f}m  {text}", 16, text_right - left) for t, text in game.messages
+    ]
+    y = bottom - 18 * (sum(len(lines) for lines in rows) + 1)
+    for lines in rows:
+        for i, line in enumerate(lines):
+            rl.draw_text(line, left + (0 if i == 0 else 56), y, 16, _color(rl, HUD_DIM))
+            y += 18
+    if pad is None:
+        help_line = (
+            "W/S telegraph  A/D rudder  Q midships  SPACE dive  C deep  F fire  T target  "
+            "-/= zoom  1-6 time  P pause  L legend"
+        )
+        rl.draw_text(help_line, left, bottom, 16, _color(rl, HUD_DIM))
     scale_px = int(1000.0 / game.zoom)
-    rl.draw_line(10, height - 40, 10 + scale_px, height - 40, _color(rl, HUD_DIM))
-    rl.draw_text("1 km", 14 + scale_px, height - 48, 16, _color(rl, HUD_DIM))
+    rl.draw_line(left, bottom - 14, left + scale_px, bottom - 14, _color(rl, HUD_DIM))
+    rl.draw_text("1 km", left + 4 + scale_px, bottom - 22, 16, _color(rl, HUD_DIM))
 
     tag = f"build {BUILD_ID}  seed {game.seed}  t={world.time:6.1f}s"
     tw = rl.measure_text(tag, 16)
-    rl.draw_text(tag, width - tw - 10, height - 48, 16, _color(rl, HUD_DIM))
+    rl.draw_text(tag, right - tw, bottom - 22, 16, _color(rl, HUD_DIM))
 
+    touch = pad is not None
     if game.confirming_restart:
-        text = "Abandon this hunt and start a new one?   Y / R: yes    N: no"
+        answer = "YES / NO" if touch else "Y / R: yes    N: no"
+        text = f"Abandon this hunt and start a new one?   {answer}"
         tw = rl.measure_text(text, 24)
         rl.draw_rectangle(
             (width - tw) // 2 - 12, height // 2 - 52, tw + 24, 40, _color(rl, PANEL_BG)
         )
         rl.draw_text(text, (width - tw) // 2, height // 2 - 44, 24, _color(rl, ALERT))
     elif game.paused:
-        text = "PAUSED  -  P to resume"
+        text = "PAUSED  -  RUN to resume" if touch else "PAUSED  -  P to resume"
         tw = rl.measure_text(text, 24)
         rl.draw_text(text, (width - tw) // 2, height // 2 - 40, 24, _color(rl, HUD))
     if mission["status"] != "active":
+        again = "NEW for a new hunt" if touch else "R for a new hunt"
         text = (
             f"HUNT OVER ({mission['reason']}): {len(mission['sunk'])} sunk, "
-            f"{mission['tonnage']:,} GRT, {len(mission['escaped'])} got away   -   R for a new hunt"
+            f"{mission['tonnage']:,} GRT, {len(mission['escaped'])} got away   -   {again}"
         )
         tw = rl.measure_text(text, 20)
         rl.draw_text(text, (width - tw) // 2, height // 2 - 10, 20, _color(rl, HUD))
+
+
+def _wrap(rl, text: str, size: int, max_width: float) -> list[str]:
+    """Break ``text`` at spaces into lines no wider than ``max_width`` px."""
+    lines: list[str] = []
+    line = ""
+    for word in text.split(" "):
+        trial = f"{line} {word}" if line else word
+        if line and rl.measure_text(trial, size) > max_width:
+            lines.append(line)
+            line = word
+        else:
+            line = trial
+    return lines + [line] if line else lines
 
 
 # (swatch kind, colour, text) rows of the legend; swatch kinds are drawn by _draw_swatch.
@@ -400,18 +434,25 @@ LEGEND = (
     ("dot", DEPTH_CHARGE, "depth charge sinking"),
     ("blur", CUE, "intel / last seen (arrow when off screen)"),
 )
-LEGEND_WIDTH = 345
+LEGEND_WIDTH = 420  # fits the longest row at 14 px
 LEGEND_ROW = 18
 
 
-def _draw_legend(rl, width: int, height: int) -> None:
-    """Symbol key in the lower right, above the build tag (L toggles it)."""
+def _draw_legend(rl, width: int, height: int, pad: Pad | None) -> None:
+    """Symbol key in the lower right, above the build tag (L toggles it).  With touch
+    buttons up it is centred instead, where no button covers it."""
     rows = len(LEGEND)
     panel_h = LEGEND_ROW * (rows + 1) + 10
-    x0 = width - LEGEND_WIDTH - 10
-    y0 = height - 56 - panel_h
+    if pad is None:
+        x0 = width - LEGEND_WIDTH - 10
+        y0 = height - 56 - panel_h
+        title = "LEGEND  (L to hide)"
+    else:
+        x0 = (width - LEGEND_WIDTH) // 2
+        y0 = max(HUD_TOP, (height - panel_h) // 2)
+        title = "LEGEND  (? to hide)"
     rl.draw_rectangle(x0, y0, LEGEND_WIDTH, panel_h, _color(rl, PANEL_BG))
-    rl.draw_text("LEGEND  (L to hide)", x0 + 8, y0 + 6, 14, _color(rl, HUD))
+    rl.draw_text(title, x0 + 8, y0 + 6, 14, _color(rl, HUD))
     y = y0 + 6 + LEGEND_ROW
     for kind, rgba, text in LEGEND:
         _draw_swatch(rl, kind, x0 + 20, y + 7, rgba)
