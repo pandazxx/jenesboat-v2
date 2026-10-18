@@ -1,0 +1,13 @@
+{
+  "built_at": "2026-10-18T05:37:26+00:00",
+  "cdn": "https://pygame-web.github.io/archives/0.9/",
+  "kind": "pr",
+  "name": "f09a1b8",
+  "pr": 20,
+  "pybuild": "3.12",
+  "ref": "topic/19-mobile",
+  "run_url": "https://github.com/pandazxx/jenesboat-v2/actions/runs/39101123668",
+  "sha": "f09a1b8a5a8e8675d54a84b6e7e4cc1d9a2ff324",
+  "title": "Mobile: fill any landscape screen and add on-screen touch buttons",
+  "url": "https://pandazxx.github.io/jenesboat-v2/builds/f09a1b8/"
+}
