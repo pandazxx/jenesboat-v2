@@ -239,3 +239,17 @@ def test_restart_needs_no_confirmation_once_the_hunt_is_over(captured):
     game.world.mission_over = True
     game.apply(Controls(restart=True), 0.1)
     assert game.restarts == 1
+
+
+def test_events_go_to_the_js_console_only_when_there_is_one(capsys, monkeypatch):
+    lines = []
+
+    class Console:
+        def log(self, line):
+            lines.append(line)
+
+    monkeypatch.setattr(events, "_js_console", Console())
+    monkeypatch.setattr(events, "_js_console_resolved", True)
+    events.emit("ping", n=1)
+    assert lines == ['JENESBOAT {"event":"ping","n":1}']
+    assert capsys.readouterr().out == ""  # not printed as well: pygbag echoes stdout there

@@ -143,3 +143,31 @@ def test_read_controls_merges_keyboard_and_touch_and_logs_both():
     assert {"event": "input", "key": "W"} in logged
     assert {"event": "input", "key": "F", "source": "touch"} in logged
     assert {"event": "input", "key": "T", "source": "touch"} in logged
+
+
+class FakeBridge:
+    def __init__(self):
+        self.calls = []
+
+    def get(self, name):
+        return None
+
+    def call(self, name, *args):
+        self.calls.append((name, *args))
+
+
+def test_buffer_fit_asks_for_css_times_dpr_and_gives_up_after_a_few_tries():
+    bridge = FakeBridge()
+    fit = app.BufferFit(bridge)
+    phone = app.Layout(976, 450, 852, 393, (852, 393))
+    assert fit.update(phone, 3.0)
+    assert bridge.calls == [("jb_fit", 2556, 1179)]
+    sharp = app.Layout(976, 450, 852, 393, (2556, 1179))
+    assert not fit.update(sharp, 3.0)  # already right
+    for _ in range(5):
+        fit.update(phone, 3.0)  # the page keeps resetting it: stop asking
+    assert len(bridge.calls) == app.BufferFit.ATTEMPTS
+    rotated = app.Layout(960, 540, 393, 852, (393, 852))
+    assert fit.update(rotated, 3.0)  # a new size gets new tries
+    assert not fit.update(phone, None) and not fit.update(phone, 0)
+    assert not app.BufferFit(None).update(phone, 2.0)

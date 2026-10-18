@@ -11,6 +11,7 @@
   logical resolution (`app.logical_size`), so a wide phone screen shows more map.
   The `#touch` block holds the on-screen buttons for touch screens and the script at the end
   of the page keeps the `jb_*` globals that `jenesboat_v2/touch.py` polls (one bit per key;
-  `JB_KEYS` must match `touch.KEYS`, a test checks it). `#rotate` covers the page in portrait.
+  `JB_KEYS` must match `touch.KEYS`, a test checks it); `jb_fit(w, h)` lets the game size the
+  GL buffer to CSS px x devicePixelRatio for sharp text. `#rotate` covers the page in portrait.
 
 Build with `just build-web [build-id]`; output lands in `dist/web/`.

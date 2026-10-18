@@ -319,7 +319,7 @@ config = {
             grid-auto-flow: column;
         }
         #pad-meta button { min-width: 44px; height: 38px; font-size: 13px; }
-        #pad-confirm {
+        #touch #pad-confirm {
             display: none;
             left: 50%;
             top: 50%;
@@ -566,7 +566,8 @@ frameborder="1"
     // match).  jb_held: buttons down right now; jb_taps: buttons pressed since the game
     // last called jb_ack().  jb_pad_left / jb_pad_right: CSS px the clusters take at the
     // left and right edges, so the HUD can keep clear of them.  jb_show(...) is called by
-    // the game when the prompt, pause state, time compression or legend changes.
+    // the game when the prompt, pause state, time compression or legend changes; jb_fit(w, h)
+    // when it wants the canvas buffer resized.
     (function () {
         const JB_KEYS = ["W", "S", "A", "D", "Q", "SPACE", "C", "F", "T", "MINUS", "EQUAL",
                          "P", "L", "R", "Y", "N", "TIME"];
@@ -583,6 +584,13 @@ frameborder="1"
         window.jb_pad_left = 0;
         window.jb_pad_right = 0;
         window.jb_ack = function () { window.jb_taps = 0; };
+        // The game asks for a GL buffer of CSS size x devicePixelRatio, so text is sharp on
+        // a phone (the runtime leaves the buffer at the CSS size).
+        window.jb_fit = function (w, h) {
+            const c = document.getElementById("canvas");
+            if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+            return true;
+        };
         window.jb_show = function (confirming, paused, timeScale, legend) {
             pad.classList.toggle("confirm", !!confirming);
             document.getElementById("jb-pause").textContent = paused ? "RUN" : "PAUSE";

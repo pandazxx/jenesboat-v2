@@ -109,6 +109,35 @@ def measure(rl, window: Any | None) -> Layout:
     return Layout(width, height, css_w, css_h, (buf_w, buf_h))
 
 
+class BufferFit:
+    """Asks the page for a GL buffer of CSS size x devicePixelRatio (sharp text on a phone).
+    Gives up after a few tries per canvas size in case something keeps resetting it."""
+
+    ATTEMPTS = 3
+
+    def __init__(self, bridge: touch.Bridge | None) -> None:
+        self.bridge = bridge
+        self.key: tuple | None = None
+        self.tries = 0
+
+    def wanted(self, layout: Layout, dpr: float) -> tuple[int, int]:
+        return int(round(layout.css_width * dpr)), int(round(layout.css_height * dpr))
+
+    def update(self, layout: Layout, dpr: float | None) -> bool:
+        """Request a resize if the buffer is not the wanted size; ``True`` when asked."""
+        if self.bridge is None or not dpr or dpr <= 0:
+            return False
+        key = (layout.css_width, layout.css_height, dpr)
+        if key != self.key:
+            self.key, self.tries = key, 0
+        want = self.wanted(layout, dpr)
+        if want == layout.buffer or self.tries >= self.ATTEMPTS or min(want) < 8:
+            return False
+        self.tries += 1
+        self.bridge.call("jb_fit", want[0], want[1])
+        return True
+
+
 def apply_layout(rl, layout: Layout) -> None:
     """Stretch the viewport over the buffer and project the logical size onto it.  Done
     every frame: raylib resets both when it thinks the window changed size."""
@@ -196,6 +225,7 @@ async def run(
         window.window_resize()
     bridge = touch.browser_bridge()
     pad = touch.TouchPad(bridge)
+    fit = BufferFit(bridge)
     layout: Layout | None = None
     rl.set_target_fps(60)
 
@@ -208,6 +238,8 @@ async def run(
         if current != layout:
             layout = current
             events.emit("viewport", **layout.snapshot())
+        if bridge is not None:
+            fit.update(layout, bridge.get("devicePixelRatio"))
         apply_layout(rl, layout)
         state = pad.poll()
         if touch_layout and not state.active:
