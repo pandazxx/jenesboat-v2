@@ -111,10 +111,10 @@ jobs:
           uv run python scripts/agent_web_test.py http://127.0.0.1:9000/ \
             --keys "W:0.3,W:0.3,W:0.3,W:0.3,D:2" --dpr 2 \
             --screenshot dist/agent/web.png --out dist/agent/web.json
-      - name: Drive the build as a phone held sideways (touch buttons)
+      - name: Drive the build as a phone held sideways (touch buttons, veteran level by URL)
         run: |
-          uv run python scripts/agent_web_test.py http://127.0.0.1:9000/ \
-            --mobile --keys "" --taps "W,W,W,W,D:2,SPACE" \
+          uv run python scripts/agent_web_test.py "http://127.0.0.1:9000/?difficulty=veteran" \
+            --mobile --keys "" --taps "W,W,W,W,D:2,SPACE" --expect-difficulty veteran \
             --screenshot dist/agent/web-mobile.png --out dist/agent/web-mobile.json
       - uses: actions/upload-artifact@v4
         if: always()

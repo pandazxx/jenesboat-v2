@@ -45,6 +45,16 @@ the time compression (`x1` cycles 1-2-4-8-16-32), zoom `-` / `+`, `?` (legend) a
 landscape; in portrait it asks you to turn the phone.
 
 
+## Difficulty
+
+Three levels: `cadet` (one destroyer, short sonar and memory, lighter charges, quick
+reloads), `patrol` (the default: two destroyers, the Milestone 2 balance) and `veteran`
+(three destroyers, longer sonar reach and memory, heavier charges, slow reloads). Pick one
+with `--difficulty <level>` (native and headless) or `?difficulty=<level>` on a web build's
+URL; the HUD tag and the objective message name the level and `R` keeps it. A level is a
+set of pluggable AI strategies plus a parameter set: `docs/DIFFICULTY.md` explains the
+framework, `docs/PARAMETERS.md` the numbers.
+
 ## Weapons
 
 - Deck gun: equiped by enemy military ships and submarine. Can only fire on surface.
@@ -103,5 +113,7 @@ just build-web   # pygbag bundle in dist/web
 
 Milestones: M0 bootstrap (#2), M1 merchant hunting (#9): spot a merchant group far away,
 predict its route, ambush it submerged and torpedo it before it sees you and runs. The hunt
-ends when every merchant is sunk or more than 20 km away, or your torpedoes are gone. Every number
-the balance depends on is in `docs/PARAMETERS.md`.
+ends when every merchant is sunk or more than 20 km away, or your torpedoes are gone. M2
+escorts (#17): destroyers with sonar and depth charges. M3 difficulty levels (#21): strategies
+and parameters per level (`docs/DIFFICULTY.md`). Every number the balance depends on is in
+`docs/PARAMETERS.md`.

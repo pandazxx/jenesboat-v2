@@ -116,5 +116,9 @@ def observe(sub: Submarine, ship: Ship, light: float = 1.0) -> Contact | None:
     return None
 
 
-def ship_sees_sub(sub: Submarine, ship: Ship, light: float = 1.0) -> bool:
-    return distance(sub.x, sub.y, ship.x, ship.y) <= ship_detection_range(sub, ship.type, light)
+def ship_sees_sub(
+    sub: Submarine, ship: Ship, light: float = 1.0, det: DetectionParams = DETECTION
+) -> bool:
+    return distance(sub.x, sub.y, ship.x, ship.y) <= ship_detection_range(
+        sub, ship.type, light, det
+    )

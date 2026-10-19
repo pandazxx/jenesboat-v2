@@ -4,7 +4,11 @@ Every tunable of the simulation lives in `src/jenesboat_v2/sim/params.py`. This 
 the values. Units in the sim are metres, seconds and m/s; headings and bearings are degrees
 clockwise from north. The HUD converts to knots and kilometres. `tests/test_params.py` checks
 the relations that the game balance depends on (e.g. "a submerged boat cannot catch a
-fleeing merchant").
+fleeing merchant"), at every difficulty level.
+
+The values below are the base sheet, which is also the `patrol` level. A hunt runs on a
+`Rules` bundle of these blocks (`world.rules`); a difficulty level swaps whole blocks for
+copies with a few numbers changed, see "Difficulty levels" at the end and `docs/DIFFICULTY.md`.
 
 ## Orders (`TELEGRAPH`, `RUDDER_MAX_ANGLE`, `RUDDER_RATE`)
 
@@ -88,8 +92,9 @@ night is a later milestone). A ship reacts only after the boat has stayed in ran
 
 ## Destroyer escort (M2: `SonarParams`, `DepthChargeParams`, `EscortAIParams`)
 
-The scenario sends two destroyers (`ESCORTS` in `scenario.py`) with the three merchants; they
-start on their formation stations, 1.2 km ahead of the group and 1.5 km off either flank.
+The scenario sends two destroyers (`SCENARIO.escorts`; one at `cadet`, three at `veteran`)
+with the three merchants; they start on their formation stations, 1.2 km ahead of the group
+and 1.5 km off either flank (a third and fourth escort take stations 3 km off the flanks).
 Lookouts use the ordinary detection table (`lookout` 1.5 makes a surfaced boat visible at
 9 km, a periscope at 1.5 km).
 
@@ -132,7 +137,7 @@ leaving the area quietly and changing course, so the track is lost.
 | formation | hold the station relative to the merchants' centre and route, at the convoy's speed |
 | alarm | a sonar fix, a lookout sighting or a torpedo hit sets the group's *datum* (where the boat is). The convoy is told (merchants within 8 km run) |
 | split | the escorts nearest the datum hunt (`hunters_per_escort` = 1 hunter per 3 escorts, 1 to 2); the rest screen. A lost hunter is replaced from the screens |
-| hunt | steer for the predicted position of the boat, 20 kn, slow to 14 kn inside 1.5 km, throw a pattern from up to 150 m away. Without a fix younger than 60 s sweep a square around the datum that widens by 1 m/s (400 m to 2.5 km) |
+| hunt | steer for the predicted position of the boat, 20 kn, slow to 14 kn inside 1.5 km, throw a pattern from up to 150 m away. Without a fix younger than 60 s run the `escort_search` strategy: `box` sweeps a square around the datum that widens by 1 m/s (400 m to 2.5 km) |
 | screen | stand 2 km from the convoy centre toward the datum, 700 m apart, facing the threat |
 | stand down | no fix or sighting for 300 s: everyone returns to formation |
 | merchants | an alerted merchant that is nearer the threat than the nearest non-hunting escort slips in behind it (the point 700 m behind it, never steering more than 90° from directly away from the boat); one already behind the escort keeps running away. With no escort it just runs away (M1 rule) |
@@ -145,3 +150,23 @@ Sinking a destroyer (1 torpedo, 1,800 GRT) adds to the separate escort bonus sho
 `(+N escort)`. Destroyers never "escape". The hunt also ends when the boat is lost
 (`boat_lost`).
 
+
+## Difficulty levels (`Rules`, `Strategies`, `Level`, `LEVELS`)
+
+A level (`docs/DIFFICULTY.md`) names the strategy for each AI slot and replaces whole
+parameter blocks. `patrol` is the base sheet above and the default; the player's boat is the
+same at every level except for the torpedo reload time, so the difficulty is in the enemy.
+
+| block . value | `cadet` | `patrol` | `veteran` | why |
+| --- | --- | --- | --- | --- |
+| `scenario.escorts` | 1 | 2 | 3 | the number of sonar sets and depth charge racks in the water, and how tight the screen is |
+| `sonar.range` | 2,400 m | 3,000 m | 3,600 m | how far from the convoy's edge a submerged boat is safe; the fleet-noise and own-speed factors apply on top |
+| `escort_ai.lose_track_time` | 180 s | 300 s | 480 s | how long escorts keep sweeping after the last fix before they go back to the convoy: the "wait it out deep" tactic gets cheaper or dearer |
+| `depth_charge.damage` | 0.3 | 0.4 | 0.5 | hull damage at the edge of the damage radius: 4, 3 or 2 near bursts to lose the boat |
+| `depth_charge.lethal_radius` | 12 m | 12 m | 15 m | veteran patterns are deadly a little further out |
+| `torpedo.reload_time` | 90 s | 120 s | 150 s | the only change to the boat: how soon a second salvo is ready |
+| strategies | `box`, `none`, `zigzag` | same | same | #22 will set `escort_evade = comb` for patrol and veteran |
+
+`tests/test_params.py::test_escort_balance_relations_hold_at_every_level` runs the balance
+relations against each level's rules, and `tests/test_difficulty.py` pins the ordering of the
+numbers in the table.

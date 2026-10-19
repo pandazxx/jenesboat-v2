@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import random
 
+from jenesboat_v2.sim import difficulty
+from jenesboat_v2.sim.escort import escort_station
 from jenesboat_v2.sim.geo import bearing, project, wrap_degrees
-from jenesboat_v2.sim.params import DESTROYER, ESCORT_AI, FREIGHTER, TANKER
+from jenesboat_v2.sim.params import DESTROYER, FREIGHTER, TANKER, Level
 from jenesboat_v2.sim.submarine import new_submarine
 from jenesboat_v2.sim.world import World, new_ship
 
@@ -15,16 +17,28 @@ PASS_OFFSET = 4_000.0  # m, the route passes within this of the boat's start, ei
 SPACING = 800.0  # m between ships abreast
 INTEL_POSITION_ERROR = 2_000.0  # m, each axis
 INTEL_COURSE_ERROR = 15.0  # degrees
-ESCORTS = 2  # destroyers with the group
 
 
-def hunting_scenario(seed: int | None = None, escorts: int = ESCORTS) -> World:
+def hunting_scenario(
+    seed: int | None = None, escorts: int | None = None, level: Level | None = None
+) -> World:
     """The boat in the middle of an empty ocean; a group of merchants 14 km away on a route
     that will pass a few km from it.  The world starts with an ``intel`` event (the radio
-    report that tells the player roughly where to look)."""
+    report that tells the player roughly where to look).  ``level`` is the difficulty (the
+    default when ``None``); it sets the escort count unless ``escorts`` says otherwise."""
+    level = difficulty.level() if level is None else difficulty.check(level)
+    rules = level.rules
+    if escorts is None:
+        escorts = rules.scenario.escorts
     rng = random.Random(seed)
     half = WORLD_SIZE / 2
-    player = new_submarine(x=half, y=half, heading=rng.uniform(0.0, 360.0))
+    player = new_submarine(
+        x=half,
+        y=half,
+        heading=rng.uniform(0.0, 360.0),
+        spec=rules.submarine,
+        torpedo=rules.torpedo,
+    )
 
     direction = rng.uniform(0.0, 360.0)
     cx, cy = project(half, half, direction, CONTACT_RANGE)
@@ -43,12 +57,10 @@ def hunting_scenario(seed: int | None = None, escorts: int = ESCORTS) -> World:
         ships.append(new_ship(f"{ship_type.name}-{i + 1}", ship_type, x, y, course, spread=i - 1))
 
     for i in range(escorts):  # on their formation stations: ahead of the group, either flank
-        side = 1.0 if i % 2 == 0 else -1.0
-        x, y = project(cx, cy, course, ESCORT_AI.station_ahead)
-        x, y = project(x, y, course + 90.0, side * ESCORT_AI.station_abeam)
+        x, y = escort_station(cx, cy, course, i, rules.escort_ai)
         ships.append(new_ship(f"destroyer-{i + 1}", DESTROYER, x, y, course))
 
-    world = World(width=WORLD_SIZE, height=WORLD_SIZE, player=player, ships=ships)
+    world = World(width=WORLD_SIZE, height=WORLD_SIZE, player=player, ships=ships, level=level)
     world.rng = random.Random(rng.random())
     rx = cx + rng.uniform(-INTEL_POSITION_ERROR, INTEL_POSITION_ERROR)
     ry = cy + rng.uniform(-INTEL_POSITION_ERROR, INTEL_POSITION_ERROR)

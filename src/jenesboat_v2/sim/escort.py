@@ -4,6 +4,8 @@ boat and the fleet).  They go back to formation when the track has been lost for
 
 Everything here is a function of the ``World`` it is handed; it owns no state besides the
 per-ship ``EscortState`` and the group's ``Datum`` (the best guess of where the boat is).
+The numbers come from ``world.rules``; the behaviours a difficulty level can swap are the
+``escort_search`` and ``escort_evade`` strategy slots (``sim/difficulty.py``).
 """
 
 from __future__ import annotations
@@ -13,15 +15,9 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from jenesboat_v2.sim import ai
+from jenesboat_v2.sim.difficulty import pick, strategy
 from jenesboat_v2.sim.geo import bearing, clamp, distance, project
-from jenesboat_v2.sim.params import (
-    DEPTH_CHARGE,
-    ESCORT_AI,
-    SONAR_ASDIC,
-    DepthChargeParams,
-    EscortAIParams,
-    SonarParams,
-)
+from jenesboat_v2.sim.params import ESCORT_AI, DepthChargeParams, EscortAIParams, SonarParams
 from jenesboat_v2.sim.weapons import DepthCharge
 
 if TYPE_CHECKING:
@@ -41,7 +37,7 @@ TORPEDO_DATUM_HOLDOFF = 30.0  # s, a torpedo hit does not overrule a younger fix
 class EscortState:
     mode: str = FORMATION
     next_ping: float = 0.0
-    charges: int = DEPTH_CHARGE.magazine
+    charges: int = -1  # -1: filled from the rules' magazine when the ship joins a world
     drop_left: int = 0  # charges still to go in the current pattern
     drop_timer: float = 0.0
     cooldown_until: float = -math.inf
@@ -71,9 +67,10 @@ class Datum:
 # --- sensing -------------------------------------------------------------------------------
 
 
-def sonar_range(world: World, ship: Ship, sonar: SonarParams = SONAR_ASDIC) -> float:
+def sonar_range(world: World, ship: Ship, sonar: SonarParams | None = None) -> float:
     """What this ship's active sonar can hear right now: reduced by the noise of the other
     ships around it (its own convoy), by its own speed, and for a creeping boat."""
+    sonar = world.rules.sonar if sonar is None else sonar
     neighbours = sum(
         1
         for other in world.active_ships
@@ -96,7 +93,7 @@ def report(world: World, x: float, y: float, reason: str, by: str) -> None:
     if reason == "torpedo" and world.datum and t - world.datum.t < TORPEDO_DATUM_HOLDOFF:
         return
     fresh = world.datum is None
-    world.datum = _refresh_datum(world.datum, x, y, t, reason)
+    world.datum = _refresh_datum(world.datum, x, y, t, reason, world.rules.escort_ai)
     if fresh:
         world.emit("escort_alarm", reason=reason, by=by)
     # The convoy is told and runs for the screen.
@@ -129,7 +126,8 @@ def _refresh_datum(
     return Datum(x, y, t, reason, vx, vy, fixes)
 
 
-def _ping(world: World, ship: Ship, state: EscortState, sonar: SonarParams = SONAR_ASDIC) -> None:
+def _ping(world: World, ship: Ship, state: EscortState) -> None:
+    sonar = world.rules.sonar
     if world.time < state.next_ping:
         return
     state.next_ping = world.time + sonar.ping_interval
@@ -212,11 +210,19 @@ def _keep_station(ship: Ship, sx: float, sy: float, facing: float, speed: float,
         ship.set_throttle(clamp(speed / ship.params.max_speed, 0.0, 1.0))
 
 
-def _formation(world: World, ship: Ship, rank: int, p: EscortAIParams) -> None:
-    cx, cy, course, speed = _convoy(world, ship)
+def escort_station(
+    cx: float, cy: float, course: float, rank: int, p: EscortAIParams = ESCORT_AI
+) -> tuple[float, float]:
+    """Formation station of the escort of this ``rank``: ahead of the convoy centre and off
+    its flank, alternating sides, a station further out for each pair."""
     side = 1.0 if rank % 2 == 0 else -1.0
     sx, sy = project(cx, cy, course, p.station_ahead)
-    sx, sy = project(sx, sy, course + 90.0, side * p.station_abeam)
+    return project(sx, sy, course + 90.0, side * (1 + rank // 2) * p.station_abeam)
+
+
+def _formation(world: World, ship: Ship, rank: int, p: EscortAIParams) -> None:
+    cx, cy, course, speed = _convoy(world, ship)
+    sx, sy = escort_station(cx, cy, course, rank, p)
     _keep_station(ship, sx, sy, course, speed, p)
 
 
@@ -230,7 +236,7 @@ def _screen(world: World, ship: Ship, rank: int, count: int, p: EscortAIParams) 
     _keep_station(ship, sx, sy, toward, speed, p)
 
 
-def _drop(world: World, ship: Ship, depth_params: DepthChargeParams) -> None:
+def _drop(world: World, ship: Ship, p: EscortAIParams, depth_params: DepthChargeParams) -> None:
     """One charge of the pattern.  It is aimed where the boat will be when the charge has
     sunk to its depth (the datum's predicted path), a little to one side or the other, and
     each charge is set deeper than the last so the pattern covers the band the boat is in.
@@ -250,7 +256,7 @@ def _drop(world: World, ship: Ship, depth_params: DepthChargeParams) -> None:
     )
     state.drop_left -= 1
     state.drop_timer = depth_params.drop_interval
-    ax, ay = datum.predict(world.time + set_depth / depth_params.sink_rate)
+    ax, ay = datum.predict(world.time + set_depth / depth_params.sink_rate, p.lead_limit)
     speed = math.hypot(datum.vx, datum.vy)
     across = (
         math.degrees(math.atan2(datum.vx, datum.vy)) + 90.0
@@ -266,14 +272,9 @@ def _drop(world: World, ship: Ship, depth_params: DepthChargeParams) -> None:
     state.charges -= 1
 
 
-def _hunt(
-    world: World,
-    ship: Ship,
-    dt: float,
-    p: EscortAIParams,
-    depth_params: DepthChargeParams = DEPTH_CHARGE,
-) -> None:
+def _hunt(world: World, ship: Ship, dt: float, p: EscortAIParams) -> None:
     state, datum, t = ship.escort, world.datum, world.time
+    depth_params = world.rules.depth_charge
     assert datum is not None
     if state.drop_left > 0:  # mid-run: hold course and speed while the projectors fire
         ship.set_rudder(0.0)
@@ -281,15 +282,15 @@ def _hunt(
         if state.charges <= 0:
             state.drop_left = 0
         elif state.drop_timer <= 0.0:
-            _drop(world, ship, depth_params)
+            _drop(world, ship, p, depth_params)
         return
     # Chase where the boat will be when we get there, not where it was.
     d = distance(ship.x, ship.y, datum.x, datum.y)
-    px, py = datum.predict(t + d / max(ship.speed, p.approach_speed))
+    px, py = datum.predict(t + d / max(ship.speed, p.approach_speed), p.lead_limit)
     fresh = t - datum.t <= FRESH_DATUM
     if (
         fresh
-        and distance(ship.x, ship.y, *datum.predict(t + FIRST_CHARGE_DELAY))
+        and distance(ship.x, ship.y, *datum.predict(t + FIRST_CHARGE_DELAY, p.lead_limit))
         <= depth_params.throw_range
         and t >= state.cooldown_until
         and state.charges > 0
@@ -297,18 +298,34 @@ def _hunt(
         state.cooldown_until = t + depth_params.pattern_cooldown
         state.drop_left = depth_params.pattern_size
         world.emit("depth_charge_run", ship=ship.ship_id, charges=state.charges)
-        _drop(world, ship, depth_params)
+        _drop(world, ship, p, depth_params)
         return
     if fresh:
         _goto(ship, px, py, p.attack_speed if d > p.approach_range else p.approach_speed)
         return
-    # No recent fix: sweep a widening square around the datum.
+    pick(world.level, "escort_search")(world, ship, p)
+
+
+# --- strategies ----------------------------------------------------------------------------
+
+
+@strategy("escort_search", "box")
+def box_search(world: World, ship: Ship, p: EscortAIParams) -> None:
+    """No recent fix: sweep a square around the datum that widens as the track gets older."""
+    state, datum, t = ship.escort, world.datum, world.time
+    assert datum is not None
     radius = clamp(p.search_start + p.search_growth * (t - datum.t), p.search_start, p.search_max)
     angle = state.search_leg * 90.0 + 45.0
     wx, wy = project(datum.x, datum.y, angle, radius)
     if distance(ship.x, ship.y, wx, wy) < p.station_tolerance * 0.8:
         state.search_leg += 1
     _goto(ship, wx, wy, p.search_speed)
+
+
+@strategy("escort_evade", "none")
+def no_evasion(world: World, ship: Ship, dt: float) -> bool:
+    """The M2 escort: it never notices a torpedo."""
+    return False
 
 
 def _shelter(world: World, escorts: list[Ship], p: EscortAIParams) -> None:
@@ -325,14 +342,18 @@ def _shelter(world: World, escorts: list[Ship], p: EscortAIParams) -> None:
         ship.shelter = project(guard.x, guard.y, away, p.shelter_distance)
 
 
-def step(world: World, dt: float, p: EscortAIParams = ESCORT_AI) -> None:
+def step(world: World, dt: float, p: EscortAIParams | None = None) -> None:
     """Run one tick of every escort and set the merchants' shelter points."""
+    p = world.rules.escort_ai if p is None else p
     escorts = sorted(
         (s for s in world.active_ships if s.kind == "military"), key=lambda s: s.ship_id
     )
     if not escorts:
         return
+    evade = pick(world.level, "escort_evade")
     for e in escorts:
+        if e.escort.charges < 0:
+            e.escort.charges = world.rules.depth_charge.magazine
         _ping(world, e, e.escort)
     datum = world.datum
     if datum is not None and world.time - datum.t > p.lose_track_time:
@@ -343,6 +364,8 @@ def step(world: World, dt: float, p: EscortAIParams = ESCORT_AI) -> None:
     screens = [e for e in escorts if e.escort.mode == SCREEN]
     for rank, e in enumerate(escorts):
         mode = e.escort.mode
+        if evade(world, e, dt):
+            continue
         if datum is None or mode == FORMATION:
             _formation(world, e, rank, p)
         elif mode == HUNT:

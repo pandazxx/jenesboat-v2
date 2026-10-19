@@ -7,7 +7,7 @@ value and where it comes from; change numbers here, not in the modules that use 
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 KNOT = 0.514444  # metres per second
 HOUR = 3600.0
@@ -371,3 +371,96 @@ ESCORT_AI = EscortAIParams(
     shelter_distance=700.0,
     shelter_radius=400.0,
 )
+
+
+# --- difficulty levels ---------------------------------------------------------------------
+# A level is plain data: the parameter blocks above, bundled, with whole blocks swapped for
+# ``replace`` copies, plus the name of the strategy filling each AI slot.  The plug-in
+# mechanism (registering strategies, looking them up, checking a level) is
+# ``sim/difficulty.py``; the design is explained in ``docs/DIFFICULTY.md``.
+
+
+@dataclass(frozen=True)
+class ScenarioParams:
+    """What the hunting scenario puts on the map besides the three merchants."""
+
+    escorts: int  # destroyers with the group
+
+
+SCENARIO = ScenarioParams(escorts=2)
+
+
+@dataclass(frozen=True)
+class Rules:
+    """The complete parameter set one hunt runs on.  The world carries one and every module
+    reads its numbers from ``world.rules``; the defaults are the sheet above."""
+
+    submarine: SubmarineParams = TYPE_VIIC
+    torpedo: TorpedoParams = G7E
+    detection: DetectionParams = DETECTION
+    merchant_ai: MerchantAIParams = MERCHANT_AI
+    sonar: SonarParams = SONAR_ASDIC
+    depth_charge: DepthChargeParams = DEPTH_CHARGE
+    escort_ai: EscortAIParams = ESCORT_AI
+    scenario: ScenarioParams = SCENARIO
+
+
+@dataclass(frozen=True)
+class Strategies:
+    """Which behaviour fills each AI decision point (a *slot*).  Each value names a strategy
+    registered in ``sim/difficulty.py``; the defaults are the M1/M2 behaviours."""
+
+    escort_search: str = "box"  # how a hunter sweeps for a boat whose track has gone stale
+    escort_evade: str = "none"  # what an escort does about a torpedo running at it
+    merchant_flee: str = "zigzag"  # how an alerted merchant runs
+
+
+@dataclass(frozen=True)
+class Level:
+    name: str  # the id used on the command line, the URL and in events
+    title: str  # what the HUD shows
+    description: str  # one line for --help and the docs
+    rules: Rules
+    strategies: Strategies
+
+
+CADET = Level(
+    name="cadet",
+    title="Cadet",
+    description="one destroyer with a short sonar and a short memory, lighter charges, "
+    "quick reloads",
+    rules=Rules(
+        torpedo=replace(G7E, reload_time=90.0),
+        sonar=replace(SONAR_ASDIC, range=2_400.0),
+        depth_charge=replace(DEPTH_CHARGE, damage=0.3),
+        escort_ai=replace(ESCORT_AI, lose_track_time=180.0),
+        scenario=ScenarioParams(escorts=1),
+    ),
+    strategies=Strategies(),
+)
+
+PATROL = Level(
+    name="patrol",
+    title="Patrol",
+    description="two destroyers, the Milestone 2 balance (the default)",
+    rules=Rules(),
+    strategies=Strategies(),
+)
+
+VETERAN = Level(
+    name="veteran",
+    title="Veteran",
+    description="three destroyers with longer sonar reach and memory, heavier charges, "
+    "slow reloads",
+    rules=Rules(
+        torpedo=replace(G7E, reload_time=150.0),
+        sonar=replace(SONAR_ASDIC, range=3_600.0),
+        depth_charge=replace(DEPTH_CHARGE, damage=0.5, lethal_radius=15.0),
+        escort_ai=replace(ESCORT_AI, lose_track_time=480.0),
+        scenario=ScenarioParams(escorts=3),
+    ),
+    strategies=Strategies(),
+)
+
+LEVELS: dict[str, Level] = {level.name: level for level in (CADET, PATROL, VETERAN)}
+DEFAULT_LEVEL = PATROL.name

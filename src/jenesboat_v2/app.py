@@ -17,6 +17,8 @@ from typing import Any
 from jenesboat_v2 import events, render, touch
 from jenesboat_v2._build_info import BUILD_ID, GIT_SHA
 from jenesboat_v2.game import TIME_SCALES, Controls, Game
+from jenesboat_v2.sim.difficulty import LEVEL_NAMES
+from jenesboat_v2.sim.difficulty import level as resolve_level
 
 WIDTH = 960
 HEIGHT = 540
@@ -190,6 +192,18 @@ def controls_from_keys(pressed: set[str], held: set[str], time_scale: int) -> Co
     )
 
 
+def page_difficulty(bridge: touch.Bridge | None) -> str | None:
+    """The level named by ``?difficulty=<name>`` on the page URL (the page copies it into
+    ``jb_difficulty``); ``None`` when absent, and unknown names are reported and ignored."""
+    name = bridge.text("jb_difficulty") if bridge is not None else None
+    if not name:
+        return None
+    if name not in LEVEL_NAMES:
+        events.emit("warning", what="difficulty", value=name, known=list(LEVEL_NAMES))
+        return None
+    return name
+
+
 def read_controls(rl, pad: touch.TouchState, time_scale: int) -> Controls:
     """Keyboard and touch buttons merged; also logs the presses agents watch for."""
     pressed, held = keyboard_state(rl)
@@ -207,12 +221,14 @@ async def run(
     size: tuple[int, int] | None = None,
     touch_layout: bool = False,
     screenshot: str | None = None,
+    difficulty: str | None = None,
 ) -> None:
     """Open the window and run until closed (or ``max_seconds`` of game time elapsed).
 
     ``size`` is the native window size; ``touch_layout`` lays the HUD out as on a touch
     screen without one (to look at it on a desktop); ``screenshot`` saves the frame at
-    SCREENSHOT_AT seconds of game time and quits.
+    SCREENSHOT_AT seconds of game time and quits; ``difficulty`` names the level (in the
+    browser the page URL's ``?difficulty=`` is used when this is ``None``).
     """
     import pyray as rl
 
@@ -231,8 +247,17 @@ async def run(
     layout: Layout | None = None
     rl.set_target_fps(60)
 
-    events.emit("ready", build=BUILD_ID, sha=GIT_SHA, platform=system, width=width, height=height)
-    game = Game(seed=seed)
+    level = resolve_level(difficulty if difficulty is not None else page_difficulty(bridge))
+    events.emit(
+        "ready",
+        build=BUILD_ID,
+        sha=GIT_SHA,
+        platform=system,
+        width=width,
+        height=height,
+        difficulty=level.name,
+    )
+    game = Game(seed=seed, difficulty=level.name)
 
     while not rl.window_should_close():
         dt = min(rl.get_frame_time(), 0.1)
@@ -271,5 +296,14 @@ def main(
     size: tuple[int, int] | None = None,
     touch_layout: bool = False,
     screenshot: str | None = None,
+    difficulty: str | None = None,
 ) -> None:
-    asyncio.run(run(seed=seed, size=size, touch_layout=touch_layout, screenshot=screenshot))
+    asyncio.run(
+        run(
+            seed=seed,
+            size=size,
+            touch_layout=touch_layout,
+            screenshot=screenshot,
+            difficulty=difficulty,
+        )
+    )

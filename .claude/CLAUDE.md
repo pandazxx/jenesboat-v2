@@ -19,7 +19,13 @@ propeller speed, weapons, and ship AI strategies). Art style: simple lines/boxes
   logical px (`app.logical_size`) and polls the buttons through `touch.py` (one bit per key,
   the page's `JB_KEYS` must match `touch.KEYS`).
 - Every tunable number lives in `sim/params.py` and is explained in `docs/PARAMETERS.md`;
-  balance changes edit those, not the modules that use them.
+  balance changes edit those, not the modules that use them. The sim reads them through
+  `world.rules` (a `Rules` bundle), never from the module constants directly.
+- Difficulty (`docs/DIFFICULTY.md`): a `Level` in `sim/params.py` is plain data (a `Rules`
+  bundle plus a `Strategies` record naming the behaviour for each AI slot). AI behaviours
+  that a level may swap are functions registered with `@strategy(slot, name)` from
+  `sim/difficulty.py` and selected with `pick(world.level, slot)`; a new slot is a field on
+  `Strategies` with its signature documented in `sim/difficulty.py`.
 - The browser runtime (pygbag) is CPython 3.12: keep the package 3.12-compatible.
 - `just build-web <id>` builds `dist/web`; `just sim` runs the headless simulation;
   `just agent-web-test <url>` drives a build in headless Chromium (see `docs/AGENT_TESTING.md`).
