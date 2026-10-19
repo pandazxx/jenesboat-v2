@@ -31,8 +31,11 @@ does not, so a paused stretch shortens the simulated time).
 Events (one JSON object per line, `t` in game seconds): `ready`, `intel` (the radio report:
 approximate bearing/range/course of the group), `order`, `contact` / `contact_lost`
 (`method` is `visual` or `hydrophone`), `alert` (merchants start running; `reason` is `sighted`
-or `torpedo`), `fire`, `fire_refused`, `hit`, `sunk` (with `tonnage`), `torpedo_lost`,
-`escaped`, `mission_end`, `pause`, `restart`, `state` (every second with `--trace`), `final`.
+or `torpedo`), `fire`, `fire_refused`, `hit` (with `angle`, the track angle off the ship's
+axis), `glance` (a bow-on or stern-on torpedo that did not detonate), `torpedo_seen` (an escort
+heard a torpedo and dodges it; `cpa` and `seconds` to the closest approach), `sunk` (with
+`tonnage`), `torpedo_lost`, `escaped`, `mission_end`, `pause`, `restart`, `state` (every
+second with `--trace`), `final`.
 `ready`, `restart`, `state` and `final` carry `difficulty` (the level name).
 A `state`/`final` payload looks like:
 
@@ -45,7 +48,7 @@ A `state`/`final` payload looks like:
            "speed_kn":8.0,"hits":0,"sunk":false,"escaped":false,"alerted":false}, ...],
  "contacts":[{"id":"freighter-1","method":"hydrophone","bearing":38.0}, ...],
  "torpedoes":[{"id":1,"x":...,"y":...,"heading":35.0,"run":450.0,"armed":true,"alive":true}],
- "target":"freighter-1","solution":{"run":1800.0,"time":117.0,"error":-12.0},
+ "target":"freighter-1","solution":{"run":1800.0,"time":117.0,"error":-12.0,"track_angle":85},
  "tonnage":0,"log_nm":1.25,
  "mission":{"status":"active","sunk":[],"escaped":[],"remaining":[...],
             "tonnage":0,"torpedoes_left":11},
@@ -57,7 +60,8 @@ A `state`/`final` payload looks like:
 hydrophone contacts are the operator's estimate of position, course and speed with an empty
 `type` and never yield a firing solution. `ships` is ground truth for checking. `solution` is the
 fire-control helper for the nearest visual contact: `error` near 0 means a torpedo fired now
-along the heading meets the target. `mission.status` is `active`, `complete` (every merchant sunk or got away: more than 20 km
+along the heading meets the target; `track_angle` under 30 means it would be a glancing blow
+that may not detonate (`docs/PARAMETERS.md`, "Attack angle"). `mission.status` is `active`, `complete` (every merchant sunk or got away: more than 20 km
 from the boat or off the map) or `out_of_torpedoes`; `mission.reason` says which.
 `cue` is where to look when nothing is in sight: the intel
 report, or the dead-reckoned position of the ship fixed last (`kind` = `last_seen`); `null`

@@ -16,9 +16,9 @@ from typing import TYPE_CHECKING
 
 from jenesboat_v2.sim import ai
 from jenesboat_v2.sim.difficulty import pick, strategy
-from jenesboat_v2.sim.geo import bearing, clamp, distance, project
+from jenesboat_v2.sim.geo import angle_diff, bearing, clamp, distance, project, wrap_degrees
 from jenesboat_v2.sim.params import ESCORT_AI, DepthChargeParams, EscortAIParams, SonarParams
-from jenesboat_v2.sim.weapons import DepthCharge
+from jenesboat_v2.sim.weapons import DepthCharge, Torpedo
 
 if TYPE_CHECKING:
     from jenesboat_v2.sim.world import Ship, World
@@ -43,6 +43,8 @@ class EscortState:
     cooldown_until: float = -math.inf
     search_leg: int = 0
     sonar_range: float = 0.0  # m, what the set could hear right now (for the HUD and tests)
+    evading: int | None = None  # id of the torpedo the ship is dodging
+    evade_at: float = 0.0  # s, when the helm answers (after the reaction time)
 
 
 @dataclass
@@ -326,6 +328,92 @@ def box_search(world: World, ship: Ship, p: EscortAIParams) -> None:
 def no_evasion(world: World, ship: Ship, dt: float) -> bool:
     """The M2 escort: it never notices a torpedo."""
     return False
+
+
+def closest_approach(ship: Ship, torpedo: Torpedo) -> tuple[float, float]:
+    """``(distance, seconds)`` of the torpedo's closest pass to the ship if both hold course
+    and speed; the seconds are negative once it is moving away."""
+    rad = math.radians(torpedo.heading)
+    tvx, tvy = math.sin(rad) * torpedo.speed, math.cos(rad) * torpedo.speed
+    rad = math.radians(ship.heading)
+    svx, svy = math.sin(rad) * ship.speed, math.cos(rad) * ship.speed
+    rx, ry = ship.x - torpedo.x, ship.y - torpedo.y
+    vx, vy = svx - tvx, svy - tvy  # the ship's motion as seen from the torpedo
+    vv = vx * vx + vy * vy
+    if vv < 1e-9:
+        return math.hypot(rx, ry), math.inf
+    t = -(rx * vx + ry * vy) / vv
+    return math.hypot(rx + vx * t, ry + vy * t), t
+
+
+def comb_heading(ship: Ship, torpedo: Torpedo, comb_angle: float) -> float:
+    """The course that combs the torpedo's track: nearly parallel to it, ``comb_angle`` off
+    toward the side of the track the ship is already on, running with the torpedo or
+    toward it, whichever is the smaller turn from the present heading."""
+    d = torpedo.heading
+    rad = math.radians(d)
+    ux, uy = math.sin(rad), math.cos(rad)
+    rx, ry = ship.x - torpedo.x, ship.y - torpedo.y
+    side = rx * uy - ry * ux  # > 0: the ship is to the right of the track
+    if abs(side) < 1.0:  # dead on the track: open toward where the bow already points
+        rad = math.radians(ship.heading)
+        side = math.sin(rad) * uy - math.cos(rad) * ux
+    sign = 1.0 if side >= 0 else -1.0
+    with_it = wrap_degrees(d + sign * comb_angle)
+    against = wrap_degrees(d + 180.0 - sign * comb_angle)
+    return min((with_it, against), key=lambda h: abs(angle_diff(h, ship.heading)))
+
+
+def _torpedo_threat(world: World, ship: Ship) -> tuple[Torpedo, float, float] | None:
+    """The nearest running torpedo this ship can hear (or see the wake of) that will pass
+    closer than the threat width before it runs out, with its closest approach."""
+    ev = world.rules.evasion
+    found = None
+    for torpedo in world.torpedoes:
+        if not torpedo.alive:
+            continue
+        d = distance(ship.x, ship.y, torpedo.x, torpedo.y)
+        wake = torpedo.params.wake_visible_range * ship.type.lookout * world.light
+        if d > max(ev.hear_range, wake):
+            continue
+        cpa, seconds = closest_approach(ship, torpedo)
+        if seconds <= 0.0 or cpa > ev.threat_width:
+            continue
+        if torpedo.speed * seconds > torpedo.params.max_run - torpedo.run:
+            continue  # it will run out first
+        if found is None or d < found[0]:
+            found = (d, torpedo, cpa, seconds)
+    return None if found is None else found[1:]
+
+
+@strategy("escort_evade", "comb")
+def comb_the_track(world: World, ship: Ship, dt: float) -> bool:
+    """Hear a torpedo that will pass too close and, after the reaction time, turn hard to
+    comb its track at full speed until it has gone by or run out, then carry on."""
+    state = ship.escort
+    torpedo = next((t for t in world.torpedoes if t.torpedo_id == state.evading and t.alive), None)
+    if torpedo is not None and closest_approach(ship, torpedo)[1] <= 0.0:
+        torpedo = None  # it went by
+    if torpedo is None:
+        state.evading = None
+        threat = _torpedo_threat(world, ship)
+        if threat is None:
+            return False
+        torpedo, cpa, seconds = threat
+        state.evading = torpedo.torpedo_id
+        state.evade_at = world.time + world.rules.evasion.reaction_time
+        world.emit(
+            "torpedo_seen",
+            ship=ship.ship_id,
+            torpedo=torpedo.torpedo_id,
+            cpa=round(cpa),
+            seconds=round(seconds),
+        )
+    if world.time < state.evade_at:
+        return False  # still reacting: carry on as before
+    ai.steer(ship, comb_heading(ship, torpedo, world.rules.evasion.comb_angle))
+    ship.set_throttle(1.0)
+    return True
 
 
 def _shelter(world: World, escorts: list[Ship], p: EscortAIParams) -> None:

@@ -10,7 +10,7 @@ from jenesboat_v2.sim import ai, detection, difficulty
 from jenesboat_v2.sim import escort as escort_ai
 from jenesboat_v2.sim.detection import Contact
 from jenesboat_v2.sim.escort import Datum, EscortState
-from jenesboat_v2.sim.geo import bearing, clamp, distance, project
+from jenesboat_v2.sim.geo import bearing, clamp, distance, project, track_angle
 from jenesboat_v2.sim.params import FREIGHTER, KNOT, Level, Rules, ShipType
 from jenesboat_v2.sim.submarine import Submarine, new_submarine
 from jenesboat_v2.sim.vessel import Vessel
@@ -377,9 +377,20 @@ class World:
         self.torpedoes = [t for t in self.torpedoes if t.alive]
 
     def _hit(self, torpedo: Torpedo, ship: Ship) -> None:
+        """The torpedo has reached the hull.  Nearly along the ship's axis it is a glancing
+        blow that detonates only with ``glance_chance``; either way the ship and its group
+        know a torpedo came in."""
         torpedo.alive = False
+        angle = track_angle(torpedo.heading, ship.heading)
+        rule = self.rules.torpedo_hit
+        if angle < rule.glance_angle and self.rng.random() >= rule.glance_chance:
+            self.emit("glance", torpedo=torpedo.torpedo_id, ship=ship.ship_id, angle=round(angle))
+            self._torpedo_alarm(torpedo, ship)
+            return
         ship.hits += 1
-        self.emit("hit", torpedo=torpedo.torpedo_id, ship=ship.ship_id, hits=ship.hits)
+        self.emit(
+            "hit", torpedo=torpedo.torpedo_id, ship=ship.ship_id, hits=ship.hits, angle=round(angle)
+        )
         if ship.hits >= ship.type.hits_to_sink:
             ship.sunk = True
             if ship.kind == "merchant":
@@ -394,7 +405,10 @@ class World:
                 total=self.tonnage,
                 bonus=self.bonus,
             )
-        # The others only know which way the torpedo came from.
+        self._torpedo_alarm(torpedo, ship)
+
+    def _torpedo_alarm(self, torpedo: Torpedo, ship: Ship) -> None:
+        """A torpedo struck ``ship``: the others only know which way it came from."""
         tx, ty = project(torpedo.x, torpedo.y, torpedo.heading + 180.0, THREAT_BEHIND_TORPEDO)
         panic = self.rules.merchant_ai.panic_range
         self.alert_group(tx, ty, "torpedo", by=ship.ship_id, radius=panic)

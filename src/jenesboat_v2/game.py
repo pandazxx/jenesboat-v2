@@ -281,6 +281,13 @@ def describe(name: str, data: dict) -> str | None:
         return f"{data['ship']} SUNK, {data['tonnage']:,} GRT"
     if name == "torpedo_lost":
         return f"torpedo {data['torpedo']} missed"
+    if name == "glance":
+        return (
+            f"torpedo {data['torpedo']} glanced off {data['ship']} "
+            f"({data['angle']} deg off its axis): no detonation"
+        )
+    if name == "torpedo_seen":
+        return f"{data['ship']} heard torpedo {data['torpedo']} and turns to comb its track"
     if name == "escort_alarm":
         how = {"sonar": "pinged us", "sighted": "sighted us", "torpedo": "was torpedoed"}
         return f"ESCORT: {data['by']} {how.get(data['reason'], data['reason'])}"

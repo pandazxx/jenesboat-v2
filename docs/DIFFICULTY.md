@@ -36,7 +36,7 @@ Rules of thumb:
 | slot | signature | strategies | chosen by |
 | --- | --- | --- | --- |
 | `escort_search` | `(world, ship, p: EscortAIParams) -> None`: steer a hunter whose datum is older than `FRESH_DATUM` | `box` (widening square around the datum, M2) | all levels: `box` |
-| `escort_evade` | `(world, ship, dt) -> bool`: react to the torpedoes in the water; `True` while dodging (the ship's normal behaviour is skipped that tick) | `none` (M2) | all levels: `none` until #22 lands (`comb` for patrol and veteran) |
+| `escort_evade` | `(world, ship, dt) -> bool`: react to the torpedoes in the water; `True` while dodging (the ship's normal behaviour is skipped that tick) | `none` (M2), `comb` (hear a torpedo that will pass too close, turn hard to comb its track at full speed until it has gone by; #22) | `cadet`: `none`; `patrol`, `veteran`: `comb` |
 | `merchant_flee` | `(ship, t, rules: Rules) -> None`: steer an alerted merchant; `ship.shelter` is set when an escort covers it | `zigzag` (run away zigzagging, or for the shelter point, M1/M2) | all levels: `zigzag` |
 
 ## The mechanism (`sim/difficulty.py`)
@@ -99,10 +99,16 @@ the game reports that level, so the web path is checked on every build.
 
 ## The levels
 
-`patrol` is the base sheet (Milestone 2 balance) and the default. `cadet` and `veteran`
-change a handful of blocks; the table and the reasons are in `docs/PARAMETERS.md`. Nothing in
-the player's boat changes between levels except the torpedo reload time: the difficulty is
-in the enemy, so what a player learns at one level carries over.
+`patrol` is the base sheet (Milestone 2 balance plus the #22 torpedo evasion) and the
+default. `cadet` and `veteran` change a handful of blocks; the table and the reasons are in
+`docs/PARAMETERS.md`. Nothing in the player's boat changes between levels except the torpedo
+reload time: the difficulty is in the enemy, so what a player learns at one level carries
+over.
+
+The first optional strategy, `escort_evade = comb` (#22), shows the two halves of the
+framework together: the behaviour (dodging) is a strategy that `cadet` leaves off, and the
+rule it pairs with (a bow-on torpedo is a glancing blow that may not detonate) is a parameter
+block, `TorpedoHitParams`, whose `glance_chance` the levels dial from 1.0 to 0.25.
 
 ## How to extend
 
