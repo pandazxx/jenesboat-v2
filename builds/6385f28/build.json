@@ -1,0 +1,13 @@
+{
+  "built_at": "2026-10-21T15:09:56+00:00",
+  "cdn": "https://pygame-web.github.io/archives/0.9/",
+  "kind": "pr",
+  "name": "6385f28",
+  "pr": 27,
+  "pybuild": "3.12",
+  "ref": "topic/m3-05966bf",
+  "run_url": "https://github.com/pandazxx/jenesboat-v2/actions/runs/39623101631",
+  "sha": "6385f2891fd26c1cd70b35ec4deb1e47dbde5aa3",
+  "title": "M3: Difficulty framework (rules bundle, strategy slots, levels, selection)",
+  "url": "https://pandazxx.github.io/jenesboat-v2/builds/6385f28/"
+}

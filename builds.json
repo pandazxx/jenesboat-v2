@@ -1,5 +1,19 @@
 [
   {
+    "built_at": "2026-10-21T15:09:56+00:00",
+    "cdn": "https://pygame-web.github.io/archives/0.9/",
+    "kind": "pr",
+    "name": "6385f28",
+    "pr": 27,
+    "pybuild": "3.12",
+    "ref": "topic/m3-05966bf",
+    "run_url": "https://github.com/pandazxx/jenesboat-v2/actions/runs/39623101631",
+    "sha": "6385f2891fd26c1cd70b35ec4deb1e47dbde5aa3",
+    "start_url": "builds/6385f28/start.html",
+    "title": "M3: Difficulty framework (rules bundle, strategy slots, levels, selection)",
+    "url": "builds/6385f28/"
+  },
+  {
     "built_at": "2026-10-21T15:09:48+00:00",
     "cdn": "https://pygame-web.github.io/archives/0.9/",
     "kind": "pr",
@@ -9,6 +23,7 @@
     "ref": "topic/30-no-select",
     "run_url": "https://github.com/pandazxx/jenesboat-v2/actions/runs/39623060673",
     "sha": "746df79865166258a6450d69b66c234be249999c",
+    "start_url": "builds/746df79/",
     "title": "Fix long-press text selection on touch buttons (#30)",
     "url": "builds/746df79/"
   },
@@ -22,6 +37,7 @@
     "ref": "topic/22-torpedo-evasion",
     "run_url": "https://github.com/pandazxx/jenesboat-v2/actions/runs/39189901429",
     "sha": "c63638c1c3f94faf42b6bd7616b4c74c36f46da2",
+    "start_url": "builds/c63638c/",
     "title": "AI: escorts comb a torpedo's track, bow-on torpedoes glance off (#22)",
     "url": "builds/c63638c/"
   },
@@ -35,6 +51,7 @@
     "ref": "topic/m3-05966bf",
     "run_url": "https://github.com/pandazxx/jenesboat-v2/actions/runs/39188438066",
     "sha": "fe9cedcfe055b723ed7243560af9bf1272d8c1d5",
+    "start_url": "builds/fe9cedc/",
     "title": "M3: Difficulty framework (rules bundle, strategy slots, levels, selection)",
     "url": "builds/fe9cedc/"
   },
@@ -48,6 +65,7 @@
     "ref": "master",
     "run_url": "https://github.com/pandazxx/jenesboat-v2/actions/runs/39130757025",
     "sha": "897c153e9fa14dd38001c0ac5e3783b16da2f193",
+    "start_url": "builds/897c153/",
     "title": "Merge pull request #20 from pandazxx/topic/19-mobile",
     "url": "builds/897c153/"
   },
@@ -61,6 +79,7 @@
     "ref": "topic/19-mobile",
     "run_url": "https://github.com/pandazxx/jenesboat-v2/actions/runs/39105651627",
     "sha": "f19271e96d204dc73587a97c172e1960c2b5751e",
+    "start_url": "builds/f19271e/",
     "title": "Mobile: fill any landscape screen and add on-screen touch buttons",
     "url": "builds/f19271e/"
   },
@@ -74,6 +93,7 @@
     "ref": "topic/19-mobile",
     "run_url": "https://github.com/pandazxx/jenesboat-v2/actions/runs/39103693827",
     "sha": "57385a4bdd99794bd097b62e67b50d2091439a95",
+    "start_url": "builds/57385a4/",
     "title": "Mobile: fill any landscape screen and add on-screen touch buttons",
     "url": "builds/57385a4/"
   },
@@ -87,6 +107,7 @@
     "ref": "topic/19-mobile",
     "run_url": "https://github.com/pandazxx/jenesboat-v2/actions/runs/39101123668",
     "sha": "f09a1b8a5a8e8675d54a84b6e7e4cc1d9a2ff324",
+    "start_url": "builds/f09a1b8/",
     "title": "Mobile: fill any landscape screen and add on-screen touch buttons",
     "url": "builds/f09a1b8/"
   },
@@ -100,6 +121,7 @@
     "ref": "master",
     "run_url": "https://github.com/pandazxx/jenesboat-v2/actions/runs/39098860549",
     "sha": "e2840dd230c6a08d6757e7b38e5fe2416ca96609",
+    "start_url": "builds/e2840dd/",
     "title": "Merge pull request #18 from pandazxx/topic/17-escort",
     "url": "builds/e2840dd/"
   },
@@ -113,6 +135,7 @@
     "ref": "topic/17-escort",
     "run_url": "https://github.com/pandazxx/jenesboat-v2/actions/runs/39098839579",
     "sha": "d815740323e7ea71d55c9c310c60dc70b7aa1305",
+    "start_url": "builds/d815740/",
     "title": "M2: destroyer escort (sonar, depth charges, hunter/screen AI)",
     "url": "builds/d815740/"
   },
@@ -126,6 +149,7 @@
     "ref": "topic/17-escort",
     "run_url": "https://github.com/pandazxx/jenesboat-v2/actions/runs/39033872285",
     "sha": "04186dbd1a38617bf1a62768140173486810ff31",
+    "start_url": "builds/04186db/",
     "title": "M2: destroyer escort (sonar, depth charges, hunter/screen AI)",
     "url": "builds/04186db/"
   },
@@ -139,6 +163,7 @@
     "ref": "topic/17-escort",
     "run_url": "https://github.com/pandazxx/jenesboat-v2/actions/runs/39031900476",
     "sha": "5498bb7299d1ef4ff0d23a2f9346977c03070bc3",
+    "start_url": "builds/5498bb7/",
     "title": "M2: destroyer escort (sonar, depth charges, hunter/screen AI)",
     "url": "builds/5498bb7/"
   },
@@ -152,6 +177,7 @@
     "ref": "topic/17-escort",
     "run_url": "https://github.com/pandazxx/jenesboat-v2/actions/runs/38926992896",
     "sha": "743103014c1e67abb899d2714003d3e436534ca1",
+    "start_url": "builds/7431030/",
     "title": "M2: destroyer escort (sonar, depth charges, hunter/screen AI)",
     "url": "builds/7431030/"
   },
@@ -165,6 +191,7 @@
     "ref": "topic/9-release-0.2.0",
     "run_url": "https://github.com/pandazxx/jenesboat-v2/actions/runs/38922611811",
     "sha": "629b66595e5b41741683dfed26254746507b32f4",
+    "start_url": "builds/629b665/",
     "title": "Bump version to 0.2.0 for the Milestone 1 release",
     "url": "builds/629b665/"
   },
@@ -178,6 +205,7 @@
     "ref": "master",
     "run_url": "https://github.com/pandazxx/jenesboat-v2/actions/runs/38922138056",
     "sha": "0eb01736557482d298dd1e621e75e6ec740b3ba4",
+    "start_url": "builds/0eb0173/",
     "title": "Merge pull request #15 from pandazxx/topic/m1-35e379f",
     "url": "builds/0eb0173/"
   },
@@ -191,6 +219,7 @@
     "ref": "topic/m1-35e379f",
     "run_url": "https://github.com/pandazxx/jenesboat-v2/actions/runs/38913851996",
     "sha": "42e3138b3d910766473efcc1d7bdd1c8a912e952",
+    "start_url": "builds/42e3138/",
     "title": "Milestone 1: merchant hunting - parameters, submarine tuning, visibility, merchant AI, torpedoes, hunt loop",
     "url": "builds/42e3138/"
   },
@@ -204,6 +233,7 @@
     "ref": "topic/m1-35e379f",
     "run_url": "https://github.com/pandazxx/jenesboat-v2/actions/runs/38902151748",
     "sha": "d0ffa872a99173876fbd1213df58c36ddacb5494",
+    "start_url": "builds/d0ffa87/",
     "title": "Milestone 1: merchant hunting - parameters, submarine tuning, visibility, merchant AI, torpedoes, hunt loop",
     "url": "builds/d0ffa87/"
   },
@@ -217,6 +247,7 @@
     "ref": "topic/m1-35e379f",
     "run_url": "https://github.com/pandazxx/jenesboat-v2/actions/runs/38855981478",
     "sha": "dd88f6a7df9bff5db9bd4f482f0ec9a1934d9249",
+    "start_url": "builds/dd88f6a/",
     "title": "Milestone 1: merchant hunting - parameters, submarine tuning, visibility, merchant AI, torpedoes, hunt loop",
     "url": "builds/dd88f6a/"
   },
@@ -230,6 +261,7 @@
     "ref": "topic/m1-35e379f",
     "run_url": "https://github.com/pandazxx/jenesboat-v2/actions/runs/38837460587",
     "sha": "00dd52371684868681bedd46b7ea7d96ab55d7bc",
+    "start_url": "builds/00dd523/",
     "title": "Milestone 1: merchant hunting - parameters, submarine tuning, visibility, merchant AI, torpedoes, hunt loop",
     "url": "builds/00dd523/"
   },
@@ -243,6 +275,7 @@
     "ref": "topic/m1-35e379f",
     "run_url": "https://github.com/pandazxx/jenesboat-v2/actions/runs/38752373857",
     "sha": "6ef4f8de7bf6ed98d06cf330b342a71b008a6a51",
+    "start_url": "builds/6ef4f8d/",
     "title": "Milestone 1: merchant hunting - parameters, submarine tuning, visibility, merchant AI, torpedoes, hunt loop",
     "url": "builds/6ef4f8d/"
   },
@@ -256,6 +289,7 @@
     "ref": "topic/m1-35e379f",
     "run_url": "https://github.com/pandazxx/jenesboat-v2/actions/runs/38692349977",
     "sha": "64f14c9d3e32db1e6758219977120b57b6661cbe",
+    "start_url": "builds/64f14c9/",
     "title": "Milestone 1: merchant hunting - parameters, submarine tuning, visibility, merchant AI, torpedoes, hunt loop",
     "url": "builds/64f14c9/"
   },
@@ -269,6 +303,7 @@
     "ref": "topic/m1-35e379f",
     "run_url": "https://github.com/pandazxx/jenesboat-v2/actions/runs/38586988743",
     "sha": "ad20383a96f1892c8b4b73a59026c617aad1d986",
+    "start_url": "builds/ad20383/",
     "title": "Milestone 1: merchant hunting - parameters, submarine tuning, visibility, merchant AI, torpedoes, hunt loop",
     "url": "builds/ad20383/"
   },
@@ -282,6 +317,7 @@
     "ref": "master",
     "run_url": "https://github.com/pandazxx/jenesboat-v2/actions/runs/38569191182",
     "sha": "441d9c3b1346ff8dde5cd58b190c6940ba6e2d16",
+    "start_url": "builds/441d9c3/",
     "title": "Merge pull request #8 from pandazxx/topic/m0-3672910",
     "url": "builds/441d9c3/"
   },
@@ -295,6 +331,7 @@
     "ref": "topic/m0-3672910",
     "run_url": "https://github.com/pandazxx/jenesboat-v2/actions/runs/38562543804",
     "sha": "3498aafd9778604216cb0c81938d79f01cc5e1f0",
+    "start_url": "builds/3498aaf/",
     "title": "Milestone 0: conventions, CI/CD to Pages, agent testing, bare-minimum demo",
     "url": "builds/3498aaf/"
   },
@@ -308,6 +345,7 @@
     "ref": "topic/m0-3672910",
     "run_url": "https://github.com/pandazxx/jenesboat-v2/actions/runs/38262875228",
     "sha": "64f220d3b3551777903043db8bf5e6bcf5f3daf2",
+    "start_url": "builds/64f220d/",
     "title": "Milestone 0: conventions, CI/CD to Pages, agent testing, bare-minimum demo",
     "url": "builds/64f220d/"
   },
@@ -321,6 +359,7 @@
     "ref": "topic/m0-3672910",
     "run_url": "https://github.com/pandazxx/jenesboat-v2/actions/runs/38261794969",
     "sha": "b147748cb89768898d75b742a8eb460454511f0c",
+    "start_url": "builds/b147748/",
     "title": "Milestone 0: conventions, CI/CD to Pages, agent testing, bare-minimum demo",
     "url": "builds/b147748/"
   },
@@ -334,6 +373,7 @@
     "ref": "topic/m0-3672910",
     "run_url": "https://github.com/pandazxx/jenesboat-v2/actions/runs/38126459311",
     "sha": "b649e5a2d8f599bc470868517712a9591eaecca9",
+    "start_url": "builds/b649e5a/",
     "title": "Milestone 0: conventions, CI/CD to Pages, agent testing, bare-minimum demo",
     "url": "builds/b649e5a/"
   }
