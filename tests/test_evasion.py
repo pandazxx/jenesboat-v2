@@ -275,9 +275,7 @@ def test_messages_for_the_new_events():
 
 def test_levels_select_the_strategy_and_the_glance_chance():
     assert P.CADET.strategies.escort_evade == "none"
-    assert (
-        P.PATROL.strategies.escort_evade == "veteran" or P.PATROL.strategies.escort_evade == "comb"
-    )
+    assert P.PATROL.strategies.escort_evade == "comb"
     assert P.VETERAN.strategies.escort_evade == "comb"
     assert P.CADET.rules.torpedo_hit.glance_chance == 1.0
     assert P.PATROL.rules.torpedo_hit.glance_chance == 0.5
