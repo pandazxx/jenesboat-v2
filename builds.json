@@ -1,5 +1,19 @@
 [
   {
+    "built_at": "2026-10-21T15:12:49+00:00",
+    "cdn": "https://pygame-web.github.io/archives/0.9/",
+    "kind": "pr",
+    "name": "8627c81",
+    "pr": 28,
+    "pybuild": "3.12",
+    "ref": "topic/22-torpedo-evasion",
+    "run_url": "https://github.com/pandazxx/jenesboat-v2/actions/runs/39623477243",
+    "sha": "8627c8169373d994b460a46b9b48943c68425212",
+    "start_url": "builds/8627c81/start.html",
+    "title": "AI: escorts comb a torpedo's track, bow-on torpedoes glance off (#22)",
+    "url": "builds/8627c81/"
+  },
+  {
     "built_at": "2026-10-21T15:09:56+00:00",
     "cdn": "https://pygame-web.github.io/archives/0.9/",
     "kind": "pr",
