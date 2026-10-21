@@ -46,6 +46,8 @@ Every CI build is deployed to GitHub Pages: <https://pandazxx.github.io/jenesboa
 | tag `v*`                      | the tag name          | `builds/v0.1.0/`            |
 
 The site root is an index of all builds, newest first; `builds.json` is the same list as JSON.
+A build directory holds the game page (`index.html`, takes `?difficulty=<name>`) and a start
+page (`start.html`) where the player picks the difficulty; the index links to the start page.
 The build id is also shown in the game HUD and in the `ready` event, so a tester can confirm
 which build is running.
 

@@ -50,10 +50,11 @@ landscape; in portrait it asks you to turn the phone.
 Three levels: `cadet` (one destroyer, short sonar and memory, lighter charges, quick
 reloads), `patrol` (the default: two destroyers, the Milestone 2 balance) and `veteran`
 (three destroyers, longer sonar reach and memory, heavier charges, slow reloads). Pick one
-with `--difficulty <level>` (native and headless) or `?difficulty=<level>` on a web build's
-URL; the HUD tag and the objective message name the level and `R` keeps it. A level is a
-set of pluggable AI strategies plus a parameter set: `docs/DIFFICULTY.md` explains the
-framework, `docs/PARAMETERS.md` the numbers.
+on a web build's start page (what the build index links to), with `?difficulty=<name>` on the
+game page's URL, or with `--difficulty <name>` (native and headless); the HUD tag and the
+objective message name it and `R` keeps it. A difficulty is a set of pluggable AI strategies
+plus a parameter set: `docs/DIFFICULTY.md` explains the framework, `docs/PARAMETERS.md` the
+numbers.
 
 ## Weapons
 

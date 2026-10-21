@@ -11,7 +11,7 @@ from jenesboat_v2.sim import escort as escort_ai
 from jenesboat_v2.sim.detection import Contact
 from jenesboat_v2.sim.escort import Datum, EscortState
 from jenesboat_v2.sim.geo import bearing, clamp, distance, project
-from jenesboat_v2.sim.params import FREIGHTER, KNOT, Level, Rules, ShipType
+from jenesboat_v2.sim.params import FREIGHTER, KNOT, Difficulty, Rules, ShipType
 from jenesboat_v2.sim.submarine import Submarine, new_submarine
 from jenesboat_v2.sim.vessel import Vessel
 from jenesboat_v2.sim.weapons import DepthCharge, Torpedo
@@ -123,7 +123,7 @@ class World:
     depth_charges: list[DepthCharge] = field(default_factory=list)
     next_charge_id: int = 0
     rng: random.Random = field(default_factory=lambda: random.Random(0))
-    level: Level = field(default_factory=difficulty.level)  # the difficulty this hunt runs on
+    difficulty: Difficulty = field(default_factory=difficulty.get)  # what this hunt runs on
 
     def __post_init__(self) -> None:
         for ship in self.ships:
@@ -135,7 +135,7 @@ class World:
     @property
     def rules(self) -> Rules:
         """The parameter set of this hunt (see ``sim/params.py``, ``Rules``)."""
-        return self.level.rules
+        return self.difficulty.rules
 
     @property
     def active_ships(self) -> list[Ship]:
@@ -256,7 +256,7 @@ class World:
         for ship in self.ships:
             if ship.active:
                 if ship.kind == "merchant":
-                    ai.merchant(ship, self.time, self.level)
+                    ai.merchant(ship, self.time, self.difficulty)
             else:
                 ship.set_throttle(0.0)
                 ship.set_rudder(0.0)
@@ -441,7 +441,7 @@ class World:
             ),
             "tonnage": self.tonnage,
             "bonus": self.bonus,
-            "difficulty": self.level.name,
+            "difficulty": self.difficulty.name,
             "mission": self.mission(),
             "cue": self.cue(),
             "log_nm": round(self.player_log / 1852.0, 3),

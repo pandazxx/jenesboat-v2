@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import random
 
-from jenesboat_v2.sim import difficulty
+from jenesboat_v2.sim.difficulty import check
+from jenesboat_v2.sim.difficulty import get as get_difficulty
 from jenesboat_v2.sim.escort import escort_station
 from jenesboat_v2.sim.geo import bearing, project, wrap_degrees
-from jenesboat_v2.sim.params import DESTROYER, FREIGHTER, TANKER, Level
+from jenesboat_v2.sim.params import DESTROYER, FREIGHTER, TANKER, Difficulty
 from jenesboat_v2.sim.submarine import new_submarine
 from jenesboat_v2.sim.world import World, new_ship
 
@@ -20,14 +21,14 @@ INTEL_COURSE_ERROR = 15.0  # degrees
 
 
 def hunting_scenario(
-    seed: int | None = None, escorts: int | None = None, level: Level | None = None
+    seed: int | None = None, escorts: int | None = None, difficulty: Difficulty | None = None
 ) -> World:
     """The boat in the middle of an empty ocean; a group of merchants 14 km away on a route
     that will pass a few km from it.  The world starts with an ``intel`` event (the radio
-    report that tells the player roughly where to look).  ``level`` is the difficulty (the
-    default when ``None``); it sets the escort count unless ``escorts`` says otherwise."""
-    level = difficulty.level() if level is None else difficulty.check(level)
-    rules = level.rules
+    report that tells the player roughly where to look).  ``difficulty`` is the default
+    when ``None``; it sets the escort count unless ``escorts`` says otherwise."""
+    difficulty = get_difficulty() if difficulty is None else check(difficulty)
+    rules = difficulty.rules
     if escorts is None:
         escorts = rules.scenario.escorts
     rng = random.Random(seed)
@@ -60,7 +61,9 @@ def hunting_scenario(
         x, y = escort_station(cx, cy, course, i, rules.escort_ai)
         ships.append(new_ship(f"destroyer-{i + 1}", DESTROYER, x, y, course))
 
-    world = World(width=WORLD_SIZE, height=WORLD_SIZE, player=player, ships=ships, level=level)
+    world = World(
+        width=WORLD_SIZE, height=WORLD_SIZE, player=player, ships=ships, difficulty=difficulty
+    )
     world.rng = random.Random(rng.random())
     rx = cx + rng.uniform(-INTEL_POSITION_ERROR, INTEL_POSITION_ERROR)
     ry = cy + rng.uniform(-INTEL_POSITION_ERROR, INTEL_POSITION_ERROR)

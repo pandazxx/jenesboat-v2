@@ -17,8 +17,8 @@ from typing import Any
 from jenesboat_v2 import events, render, touch
 from jenesboat_v2._build_info import BUILD_ID, GIT_SHA
 from jenesboat_v2.game import TIME_SCALES, Controls, Game
-from jenesboat_v2.sim.difficulty import LEVEL_NAMES
-from jenesboat_v2.sim.difficulty import level as resolve_level
+from jenesboat_v2.sim.difficulty import DIFFICULTY_NAMES
+from jenesboat_v2.sim.difficulty import get as get_difficulty
 
 WIDTH = 960
 HEIGHT = 540
@@ -193,13 +193,13 @@ def controls_from_keys(pressed: set[str], held: set[str], time_scale: int) -> Co
 
 
 def page_difficulty(bridge: touch.Bridge | None) -> str | None:
-    """The level named by ``?difficulty=<name>`` on the page URL (the page copies it into
+    """The difficulty named by ``?difficulty=<name>`` on the page URL (the page copies it into
     ``jb_difficulty``); ``None`` when absent, and unknown names are reported and ignored."""
     name = bridge.text("jb_difficulty") if bridge is not None else None
     if not name:
         return None
-    if name not in LEVEL_NAMES:
-        events.emit("warning", what="difficulty", value=name, known=list(LEVEL_NAMES))
+    if name not in DIFFICULTY_NAMES:
+        events.emit("warning", what="difficulty", value=name, known=list(DIFFICULTY_NAMES))
         return None
     return name
 
@@ -227,7 +227,7 @@ async def run(
 
     ``size`` is the native window size; ``touch_layout`` lays the HUD out as on a touch
     screen without one (to look at it on a desktop); ``screenshot`` saves the frame at
-    SCREENSHOT_AT seconds of game time and quits; ``difficulty`` names the level (in the
+    SCREENSHOT_AT seconds of game time and quits; ``difficulty`` is the level's name (in the
     browser the page URL's ``?difficulty=`` is used when this is ``None``).
     """
     import pyray as rl
@@ -247,7 +247,7 @@ async def run(
     layout: Layout | None = None
     rl.set_target_fps(60)
 
-    level = resolve_level(difficulty if difficulty is not None else page_difficulty(bridge))
+    level = get_difficulty(difficulty if difficulty is not None else page_difficulty(bridge))
     events.emit(
         "ready",
         build=BUILD_ID,

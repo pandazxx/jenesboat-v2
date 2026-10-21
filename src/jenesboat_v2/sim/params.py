@@ -374,10 +374,10 @@ ESCORT_AI = EscortAIParams(
 
 
 # --- difficulty levels ---------------------------------------------------------------------
-# A level is plain data: the parameter blocks above, bundled, with whole blocks swapped for
-# ``replace`` copies, plus the name of the strategy filling each AI slot.  The plug-in
-# mechanism (registering strategies, looking them up, checking a level) is
-# ``sim/difficulty.py``; the design is explained in ``docs/DIFFICULTY.md``.
+# A difficulty (cadet, patrol, veteran) is plain data: the parameter blocks above, bundled,
+# with whole blocks swapped for ``replace`` copies, plus the name of the strategy filling
+# each AI slot.  The plug-in mechanism (registering strategies, looking them up, checking a
+# difficulty) is ``sim/difficulty.py``; the design is explained in ``docs/DIFFICULTY.md``.
 
 
 @dataclass(frozen=True)
@@ -416,7 +416,9 @@ class Strategies:
 
 
 @dataclass(frozen=True)
-class Level:
+class Difficulty:
+    """A difficulty level (not a game level: there is one hunt, played harder or easier)."""
+
     name: str  # the id used on the command line, the URL and in events
     title: str  # what the HUD shows
     description: str  # one line for --help and the docs
@@ -424,7 +426,7 @@ class Level:
     strategies: Strategies
 
 
-CADET = Level(
+CADET = Difficulty(
     name="cadet",
     title="Cadet",
     description="one destroyer with a short sonar and a short memory, lighter charges, "
@@ -439,7 +441,7 @@ CADET = Level(
     strategies=Strategies(),
 )
 
-PATROL = Level(
+PATROL = Difficulty(
     name="patrol",
     title="Patrol",
     description="two destroyers, the Milestone 2 balance (the default)",
@@ -447,7 +449,7 @@ PATROL = Level(
     strategies=Strategies(),
 )
 
-VETERAN = Level(
+VETERAN = Difficulty(
     name="veteran",
     title="Veteran",
     description="three destroyers with longer sonar reach and memory, heavier charges, "
@@ -462,5 +464,5 @@ VETERAN = Level(
     strategies=Strategies(),
 )
 
-LEVELS: dict[str, Level] = {level.name: level for level in (CADET, PATROL, VETERAN)}
-DEFAULT_LEVEL = PATROL.name
+DIFFICULTIES: dict[str, Difficulty] = {d.name: d for d in (CADET, PATROL, VETERAN)}
+DEFAULT_DIFFICULTY = PATROL.name

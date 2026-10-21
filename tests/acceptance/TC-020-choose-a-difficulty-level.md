@@ -6,25 +6,28 @@ added_in: 27
 ---
 ## Preconditions
 
-A web build URL from the build index.
+The build index (https://pandazxx.github.io/jenesboat-v2/).
 
 ## Steps
 
-1. Open the build with `?difficulty=veteran` appended to its URL (for example
-   `https://pandazxx.github.io/jenesboat-v2/builds/<id>/?difficulty=veteran`).
+1. Click the build in the index: a start page with one button per difficulty opens
+   (`builds/<id>/start.html`). Click `Veteran`.
 2. Read the first message in the log and the tag at the bottom right of the HUD.
 3. Press `R` (or `NEW`) and confirm; read the message and the tag again.
-4. Open the build without the query, or with `?difficulty=cadet`, and read them again.
+4. Go back to the start page and pick `Cadet`; read them again. Then open the game page
+   directly (`builds/<id>/`, no query) and once with `?difficulty=veteran` on its URL.
 5. (Optional, native) `just run -- --difficulty cadet` and `just sim --difficulty veteran
    --seconds 1`: the `ready` and `final` events show `"difficulty":"veteran"`.
 
 ## Expected
 
-- With `?difficulty=veteran` the objective message starts `Objective (Veteran):` and the HUD
-  tag reads `build <id>  seed <n>  Veteran`.
+- The start page shows the build id and three buttons with a one-line description each,
+  `Patrol` marked as the default; it works on a phone held sideways.
+- After `Veteran` the objective message starts `Objective (Veteran):` and the HUD tag reads
+  `build <id>  seed <n>  Veteran`; `?difficulty=veteran` on the game URL does the same.
 - After `R` the new hunt is still `Veteran` (next seed).
-- Without the query the level is `Patrol`; with `?difficulty=cadet` it is `Cadet`. A
-  misspelt level falls back to `Patrol` (a `warning` event in the console).
+- `Cadet` gives `Cadet`; the game page without a query gives `Patrol`. A misspelt name on
+  the URL falls back to `Patrol` (a `warning` event in the console).
 
 ## Automated
 

@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from jenesboat_v2 import events
 from jenesboat_v2.sim import World, hunting_scenario
 from jenesboat_v2.sim.detection import VISUAL, Contact
-from jenesboat_v2.sim.difficulty import level as resolve_level
+from jenesboat_v2.sim.difficulty import get as get_difficulty
 from jenesboat_v2.sim.params import RUDDER_RATE
 from jenesboat_v2.sim.weapons import Solution, solution
 
@@ -57,12 +57,14 @@ class Game:
         seed: int | None = None,
         difficulty: str | None = None,
     ) -> None:
-        """``difficulty`` names a level (``sim.difficulty.LEVEL_NAMES``; the default when
-        ``None``); a ``world`` handed in brings its own level."""
+        """``difficulty`` is a name from ``sim.difficulty.DIFFICULTY_NAMES`` (the default
+        when ``None``); a ``world`` handed in brings its own difficulty."""
         self.state_interval = state_interval
         self.seed = seed if seed is not None else random.randrange(1_000_000)
-        self.level = world.level if world is not None else resolve_level(difficulty)
-        self.world = world if world is not None else hunting_scenario(self.seed, level=self.level)
+        self.difficulty = world.difficulty if world is not None else get_difficulty(difficulty)
+        self.world = (
+            world if world is not None else hunting_scenario(self.seed, difficulty=self.difficulty)
+        )
         self._since_state = 0.0
         self.state_events = 0
         self.time_scale = TIME_SCALES[0]
@@ -140,13 +142,13 @@ class Game:
         """A new hunt (next seed) at the same difficulty level."""
         self.restarts += 1
         self.seed = seed if seed is not None else self.seed + 1
-        self.world = hunting_scenario(self.seed, level=self.level)
+        self.world = hunting_scenario(self.seed, difficulty=self.difficulty)
         self.messages.clear()
         self.paused = False
         self.confirming_restart = False
         self.selected = None
         self._since_state = 0.0
-        events.emit("restart", seed=self.seed, difficulty=self.level.name)
+        events.emit("restart", seed=self.seed, difficulty=self.difficulty.name)
         self.messages.append((0.0, objective(self.world)))
         self._drain()
 
@@ -238,7 +240,7 @@ class Game:
     def snapshot(self) -> dict:
         data = self.world.snapshot()
         data["seed"] = self.seed
-        data["difficulty"] = self.level.name
+        data["difficulty"] = self.difficulty.name
         data["time_scale"] = self.time_scale
         data["paused"] = self.paused
         data["confirming_restart"] = self.confirming_restart
@@ -312,7 +314,7 @@ def objective(world: World) -> str:
     n = len(world.merchants)
     km = world.rules.merchant_ai.escape_range / 1000
     return (
-        f"Objective ({world.level.title}): sink the {n} merchants (a destroyer is a bonus). "
+        f"Objective ({world.difficulty.title}): sink the {n} merchants (a destroyer is a bonus). "
         f"The hunt ends when all are sunk or more than {km:.0f} km away, your torpedoes are "
         f"gone, or the boat is lost"
     )
