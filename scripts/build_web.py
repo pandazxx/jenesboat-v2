@@ -2,7 +2,9 @@
 """Build the browser (WebAssembly) bundle with pygbag.
 
 Stages ``web/main.py`` plus the ``jenesboat_v2`` package into ``build/web-stage/jenesboat``,
-stamps ``_build_info.py`` with the build id, runs pygbag and copies the result to ``--out``.
+stamps ``_build_info.py`` with the build id, runs pygbag and copies the result to ``--out``,
+then adds ``start.html``: the page where the player picks the difficulty before the game
+(``index.html``) opens.  The build index links to the start page.
 
     uv run python scripts/build_web.py --build-id abc1234 --sha <full sha> --out dist/web
 """
@@ -11,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import html
 import json
 import shutil
 import subprocess
@@ -20,6 +23,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = ROOT / "src" / "jenesboat_v2"
 WEB = ROOT / "web"
+START_PAGE = "start.html"
 STAGE = ROOT / "build" / "web-stage" / "jenesboat"  # folder name becomes the .apk name
 
 CDN = "https://pygame-web.github.io/archives/0.9/"
@@ -72,6 +76,54 @@ def run_pygbag(build_id: str, width: int, height: int) -> Path:
     return out
 
 
+def render_start_page(build_id: str, difficulties=None) -> str:
+    """The page before the game: one button per difficulty, each opening ``index.html`` with
+    ``?difficulty=<name>``.  ``difficulties`` is the ``DIFFICULTIES`` table (looked up from
+    the package when ``None``, so the page cannot drift from the game)."""
+    if difficulties is None:
+        sys.path.insert(0, str(ROOT / "src"))
+        from jenesboat_v2.sim.params import DEFAULT_DIFFICULTY, DIFFICULTIES  # noqa: PLC0415
+
+        difficulties = DIFFICULTIES
+        default = DEFAULT_DIFFICULTY
+    else:
+        default = next(iter(difficulties))
+    buttons = "\n".join(
+        f'<a class="level{" default" if d.name == default else ""}" '
+        f'href="index.html?difficulty={html.escape(d.name)}">'
+        f"<b>{html.escape(d.title)}</b><span>{html.escape(d.description)}</span></a>"
+        for d in difficulties.values()
+    )
+    return f"""<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>jenesboat {html.escape(build_id)}: choose the difficulty</title>
+<style>
+ body{{font:16px/1.4 system-ui,sans-serif;background:#0c203c;color:#e6e6e6;margin:0;
+      min-height:100vh;display:flex;flex-direction:column;align-items:center;
+      justify-content:center;padding:1rem;box-sizing:border-box}}
+ h1{{font-weight:normal;margin:0 0 .25rem}} h1 small,p.hint{{color:#96a0aa}}
+ p{{margin:.25rem 0 1rem;text-align:center}}
+ .levels{{display:flex;flex-wrap:wrap;gap:.75rem;justify-content:center;max-width:960px}}
+ a.level{{flex:1 1 260px;max-width:300px;padding:1rem 1.25rem;border:2px solid #1e3a60;
+         border-radius:8px;background:#061224;color:#e6e6e6;text-decoration:none}}
+ a.level:hover,a.level:focus{{border-color:#ffe678}} a.level.default{{border-color:#5a7ab0}}
+ a.level b{{display:block;font-size:1.3em;color:#ffe678;margin-bottom:.35rem}}
+ a.level span{{color:#c0c8d0}}
+ a.back{{color:#96a0aa;margin-top:1.5rem}}
+</style></head><body>
+<h1>jenesboat <small>build {html.escape(build_id)}</small></h1>
+<p>Choose the difficulty. The whole hunt runs on it; <kbd>R</kbd> / <kbd>NEW</kbd> keeps it.</p>
+<div class="levels">
+{buttons}
+</div>
+<p class="hint">Hold a phone sideways. Keys: W/S throttle, A/D rudder, Space dive, C deep,
+F fire, T target, L legend.</p>
+<a class="back" href="../../">all builds</a>
+</body></html>
+"""
+
+
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--build-id", default="dev", help="short sha, tag name or 'dev'")
@@ -99,7 +151,8 @@ def main() -> int:
     }
     meta.update(json.loads(args.meta_json))
     (out / "build.json").write_text(json.dumps(meta, indent=2, sort_keys=True) + "\n")
-    print(f"web build ready in {out}")
+    (out / START_PAGE).write_text(render_start_page(args.build_id))
+    print(f"web build ready in {out} (start page: {out / START_PAGE})")
     return 0
 
 

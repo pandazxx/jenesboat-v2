@@ -4,7 +4,9 @@
     python3 scripts/gen_build_index.py <site-dir> [--repo owner/name]
 
 Scans ``<site-dir>/builds/*/build.json`` and writes ``<site-dir>/index.html`` plus a
-machine-readable ``<site-dir>/builds.json`` (newest first) for agents.
+machine-readable ``<site-dir>/builds.json`` (newest first) for agents.  A build's link opens
+its ``start.html`` (the difficulty chooser) when it has one, else the game page directly;
+``builds.json`` carries both as ``url`` (the game page) and ``start_url``.
 """
 
 from __future__ import annotations
@@ -35,6 +37,7 @@ def load_builds(site: Path) -> list[dict]:
                 pass
         meta["name"] = d.name
         meta["url"] = f"builds/{d.name}/"
+        meta["start_url"] = meta["url"] + ("start.html" if (d / "start.html").is_file() else "")
         builds.append(meta)
     builds.sort(key=lambda b: b.get("built_at", ""), reverse=True)
     return builds
@@ -56,7 +59,8 @@ def render_rows(builds: list[dict], repo: str | None) -> str:
         ref = b.get("ref") or ""
         rows.append(
             "<tr>"
-            f'<td><a class=play href="{html.escape(b["url"])}">{html.escape(b["name"])}</a></td>'
+            f'<td><a class=play href="{html.escape(b.get("start_url") or b["url"])}">'
+            f"{html.escape(b['name'])}</a></td>"
             f"<td>{html.escape(b.get('built_at', ''))}</td>"
             f"<td>{html.escape(ref)}{(' · ' + _link(pr_url, f'PR #{pr}')) if pr else ''}</td>"
             f"<td><code>{_link(commit_url, sha[:7])}</code></td>"
@@ -83,9 +87,11 @@ def render(builds: list[dict], repo: str | None) -> str:
     latest_tag = next((b for b in builds if b.get("kind") == "tag"), None)
     quick = []
     if latest_tag:
-        quick.append(f"latest release: {_link(latest_tag['url'], latest_tag['name'])}")
+        url = latest_tag.get("start_url") or latest_tag["url"]
+        quick.append(f"latest release: {_link(url, latest_tag['name'])}")
     if latest:
-        quick.append(f"newest build: {_link(latest['url'], latest['name'])}")
+        url = latest.get("start_url") or latest["url"]
+        quick.append(f"newest build: {_link(url, latest['name'])}")
     repo_link = _link(f"https://github.com/{repo}", repo) if repo else ""
     body = "\n".join(sections) if sections else "<p>No builds published yet.</p>"
     return f"""<!doctype html>
@@ -105,6 +111,7 @@ def render(builds: list[dict], repo: str | None) -> str:
 <p class=quick>{" · ".join(quick)}{(" · " + repo_link) if repo_link else ""}
  · <a href="builds.json">builds.json</a></p>
 <p>Every CI build is playable here. Commit builds are named by short SHA, tag builds by tag.
+A build opens on its start page, where you choose the difficulty.
 Press <kbd>W</kbd>/<kbd>S</kbd> for throttle, <kbd>A</kbd>/<kbd>D</kbd> for rudder,
 <kbd>Space</kbd> to dive or surface.</p>
 {body}

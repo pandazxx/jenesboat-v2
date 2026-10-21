@@ -178,7 +178,7 @@ jobs:
         run: |
           url="$PAGES_URL/builds/$NAME/"
           echo "### Build published" >> "$GITHUB_STEP_SUMMARY"
-          echo "- play: $url" >> "$GITHUB_STEP_SUMMARY"
+          echo "- play: ${url}start.html" >> "$GITHUB_STEP_SUMMARY"
           echo "- index: $PAGES_URL/" >> "$GITHUB_STEP_SUMMARY"
       - name: Comment on PR
         if: github.event_name == 'pull_request'
@@ -187,6 +187,6 @@ jobs:
           PR: ${{ github.event.pull_request.number }}
         run: |
           url="$PAGES_URL/builds/$NAME/"
-          body="$(printf 'Web build `%s` published: %s\n\nAgent check: `just agent-web-test %s`' "$NAME" "$url" "$url")"
+          body="$(printf 'Web build `%s` published: %sstart.html\n\nAgent check: `just agent-web-test %s`' "$NAME" "$url" "$url")"
           gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "$body" --edit-last 2>/dev/null \
             || gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "$body"
