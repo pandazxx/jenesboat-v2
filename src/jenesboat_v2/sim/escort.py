@@ -305,7 +305,7 @@ def _hunt(world: World, ship: Ship, dt: float, p: EscortAIParams) -> None:
     if fresh:
         _goto(ship, px, py, p.attack_speed if d > p.approach_range else p.approach_speed)
         return
-    pick(world.level, "escort_search")(world, ship, p)
+    pick(world.difficulty, "escort_search")(world, ship, p)
 
 
 # --- strategies ----------------------------------------------------------------------------
@@ -438,7 +438,7 @@ def step(world: World, dt: float, p: EscortAIParams | None = None) -> None:
     )
     if not escorts:
         return
-    evade = pick(world.level, "escort_evade")
+    evade = pick(world.difficulty, "escort_evade")
     for e in escorts:
         if e.escort.charges < 0:
             e.escort.charges = world.rules.depth_charge.magazine

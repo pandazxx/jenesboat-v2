@@ -1,12 +1,13 @@
-"""Difficulty levels: pluggable AI strategies and per-level parameter sets.
+"""Difficulty levels: pluggable AI strategies and per-difficulty parameter sets.
 
-A *level* (``params.Level``) is plain data: a name, a ``Rules`` bundle (every parameter the
-sim runs on) and a ``Strategies`` record naming, for each AI decision point (a *slot*), the
-behaviour that fills it.  This module is the plug-in mechanism: the AI modules register
-their behaviours with ``@strategy(slot, name)`` and ask for the one the level selected with
-``pick(level, slot)``.  ``check`` validates a level, so a typo in a level fails when the
-hunt starts, not when an escort first needs that behaviour.  The design and the balance
-tables are in ``docs/DIFFICULTY.md`` and ``docs/PARAMETERS.md``.
+A difficulty (``params.Difficulty``: cadet, patrol, veteran) is plain data: a name, a
+``Rules`` bundle (every parameter the sim runs on) and a ``Strategies`` record naming, for
+each AI decision point (a *slot*), the behaviour that fills it.  This module is the plug-in
+mechanism: the AI modules register their behaviours with ``@strategy(slot, name)`` and ask
+for the one the difficulty selected with ``pick(difficulty, slot)``.  ``check`` validates a
+difficulty, so a typo in one fails when the hunt starts, not when an escort first needs
+that behaviour.  The design and the balance tables are in ``docs/DIFFICULTY.md`` and
+``docs/PARAMETERS.md``.
 
 The slots and the signature a strategy of each must have:
 
@@ -19,9 +20,9 @@ The slots and the signature a strategy of each must have:
     steer an alerted merchant (``ship.shelter`` is set when an escort is covering it).
 
 Adding a strategy: write the function in the module that owns the behaviour, decorate it,
-name it in a level.  Adding a slot: add a field to ``params.Strategies`` (its default names
-the base behaviour), document the signature above and call ``pick`` where the decision is
-made.  Adding a level: an entry in ``params.LEVELS``.
+name it in a difficulty.  Adding a slot: add a field to ``params.Strategies`` (its default
+names the base behaviour), document the signature above and call ``pick`` where the
+decision is made.  Adding a difficulty: an entry in ``params.DIFFICULTIES``.
 """
 
 from __future__ import annotations
@@ -29,10 +30,10 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import fields
 
-from jenesboat_v2.sim.params import DEFAULT_LEVEL, LEVELS, Level, Strategies
+from jenesboat_v2.sim.params import DEFAULT_DIFFICULTY, DIFFICULTIES, Difficulty, Strategies
 
 SLOTS: tuple[str, ...] = tuple(f.name for f in fields(Strategies))
-LEVEL_NAMES: tuple[str, ...] = tuple(LEVELS)
+DIFFICULTY_NAMES: tuple[str, ...] = tuple(DIFFICULTIES)
 
 _REGISTRY: dict[str, dict[str, Callable]] = {slot: {} for slot in SLOTS}
 
@@ -63,9 +64,9 @@ def available() -> dict[str, tuple[str, ...]]:
     return {slot: tuple(sorted(names)) for slot, names in _REGISTRY.items()}
 
 
-def pick(level: Level, slot: str) -> Callable:
-    """The strategy ``level`` selected for ``slot``."""
-    name = getattr(level.strategies, slot)
+def pick(difficulty: Difficulty, slot: str) -> Callable:
+    """The strategy ``difficulty`` selected for ``slot``."""
+    name = getattr(difficulty.strategies, slot)
     try:
         return _REGISTRY[slot][name]
     except KeyError:
@@ -74,28 +75,31 @@ def pick(level: Level, slot: str) -> Callable:
             return _REGISTRY[slot][name]
         known = ", ".join(sorted(_REGISTRY.get(slot, ()))) or "none registered"
         raise LookupError(
-            f"level {level.name!r}: no strategy {name!r} for slot {slot!r} (known: {known})"
+            f"difficulty {difficulty.name!r}: no strategy {name!r} for slot {slot!r} "
+            f"(known: {known})"
         ) from None
 
 
-def check(level: Level) -> Level:
-    """``level`` back, after making sure every slot names a registered strategy."""
+def check(difficulty: Difficulty) -> Difficulty:
+    """``difficulty`` back, after making sure every slot names a registered strategy."""
     for slot in SLOTS:
-        pick(level, slot)
-    return level
+        pick(difficulty, slot)
+    return difficulty
 
 
-def level(name: str | None = None) -> Level:
-    """The level called ``name`` (the default when ``None``), checked."""
+def get(name: str | None = None) -> Difficulty:
+    """The difficulty called ``name`` (the default when ``None``), checked."""
     if name is None:
-        name = DEFAULT_LEVEL
+        name = DEFAULT_DIFFICULTY
     try:
-        found = LEVELS[name]
+        found = DIFFICULTIES[name]
     except KeyError:
-        raise KeyError(f"unknown difficulty {name!r}; levels: {', '.join(LEVEL_NAMES)}") from None
+        raise KeyError(
+            f"unknown difficulty {name!r}; levels: {', '.join(DIFFICULTY_NAMES)}"
+        ) from None
     return check(found)
 
 
 def describe() -> str:
-    """One line per level, for ``--help``."""
-    return "; ".join(f"{lvl.name}: {lvl.description}" for lvl in LEVELS.values())
+    """One line per difficulty, for ``--help``."""
+    return "; ".join(f"{lvl.name}: {lvl.description}" for lvl in DIFFICULTIES.values())

@@ -12,7 +12,7 @@ from jenesboat_v2.game import Game, describe
 from jenesboat_v2.sim import params as P
 from jenesboat_v2.sim.escort import HUNT, Datum, closest_approach, comb_heading
 from jenesboat_v2.sim.geo import angle_diff, distance, project, track_angle
-from jenesboat_v2.sim.params import DESTROYER, FREIGHTER, KNOT, TORPEDO_HIT, Level
+from jenesboat_v2.sim.params import DESTROYER, FREIGHTER, KNOT, TORPEDO_HIT, Difficulty
 from jenesboat_v2.sim.submarine import new_submarine
 from jenesboat_v2.sim.weapons import Torpedo, solution
 from jenesboat_v2.sim.world import World, new_ship
@@ -20,7 +20,7 @@ from jenesboat_v2.sim.world import World, new_ship
 C = 20_000.0
 
 
-def level(evade: str = "comb", glance_chance: float = 1.0) -> Level:
+def level(evade: str = "comb", glance_chance: float = 1.0) -> Difficulty:
     """Patrol with the evasion strategy and the glance chance pinned, and an exact sonar fix,
     so each test isolates one rule and a hunter steers a straight line."""
     rules = replace(
@@ -45,7 +45,7 @@ def charging_destroyer(evade: str, range_m: float = 1_500.0, glance_chance: floa
     sub = new_submarine(x=C, y=C, heading=0.0)
     sub.depth = sub.target_depth = P.TYPE_VIIC.periscope_depth
     world = World(
-        width=2 * C, height=2 * C, player=sub, ships=[d], level=level(evade, glance_chance)
+        width=2 * C, height=2 * C, player=sub, ships=[d], difficulty=level(evade, glance_chance)
     )
     # It has had the boat on sonar for a while: hunting, straight at it, no station-keeping
     # wobble in the first seconds.
@@ -204,7 +204,7 @@ def freighter_world(torpedo_heading: float, glance_chance: float) -> World:
     sub = new_submarine(x=C, y=C - 8_000.0)
     sub.depth = sub.target_depth = 30.0
     world = World(
-        width=2 * C, height=2 * C, player=sub, ships=[ship], level=level("none", glance_chance)
+        width=2 * C, height=2 * C, player=sub, ships=[ship], difficulty=level("none", glance_chance)
     )
     x, y = project(C, C, torpedo_heading + 180.0, 400.0)
     t = Torpedo(1, x, y, torpedo_heading)

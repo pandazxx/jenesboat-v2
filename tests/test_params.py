@@ -37,9 +37,9 @@ def test_ship_types_are_indexed_by_name():
     assert P.SHIP_TYPES["tanker"].hits_to_sink == 2
 
 
-@pytest.mark.parametrize("name", list(P.LEVELS), ids=list(P.LEVELS))
+@pytest.mark.parametrize("name", list(P.DIFFICULTIES), ids=list(P.DIFFICULTIES))
 def test_escort_balance_relations_hold_at_every_level(name):
-    rules = P.LEVELS[name].rules
+    rules = P.DIFFICULTIES[name].rules
     sonar, dc, ai, det = rules.sonar, rules.depth_charge, rules.escort_ai, rules.detection
     # A destroyer out-hunts a merchant, but sprinting deafens its own sonar.
     assert P.DESTROYER.vessel.max_speed > P.FREIGHTER.vessel.max_speed

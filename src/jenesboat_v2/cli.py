@@ -31,9 +31,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--seed", type=int, default=None, help="scenario seed (random if omitted)")
     p.add_argument(
         "--difficulty",
-        choices=difficulty.LEVEL_NAMES,
+        choices=difficulty.DIFFICULTY_NAMES,
         default=None,
-        help=f"difficulty level (default {difficulty.DEFAULT_LEVEL}): {difficulty.describe()}",
+        help=f"difficulty level (default {difficulty.DEFAULT_DIFFICULTY}): {difficulty.describe()}",
     )
     p.add_argument(
         "--size",
@@ -76,7 +76,7 @@ def run_headless(
 ) -> dict:
     """Simulate ``seconds`` of game time (time compression applies on top of that)."""
     orders = sorted(json.loads(script) if script else [], key=lambda o: o.get("t", 0.0))
-    level = difficulty.level(difficulty_name)
+    level = difficulty.get(difficulty_name)
     events.emit(
         "ready",
         build=BUILD_ID,

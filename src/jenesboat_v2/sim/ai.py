@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 from jenesboat_v2.sim.difficulty import pick, strategy
 from jenesboat_v2.sim.geo import angle_diff, bearing, clamp, distance, wrap_degrees
-from jenesboat_v2.sim.params import ESCORT_AI, MERCHANT_AI, Level, MerchantAIParams, Rules
+from jenesboat_v2.sim.params import ESCORT_AI, MERCHANT_AI, Difficulty, MerchantAIParams, Rules
 
 if TYPE_CHECKING:
     from jenesboat_v2.sim.world import Ship
@@ -71,8 +71,8 @@ def flee(ship: Ship, t: float, rules: Rules) -> None:
     ship.set_throttle(1.0)
 
 
-def merchant(ship: Ship, t: float, level: Level) -> None:
+def merchant(ship: Ship, t: float, difficulty: Difficulty) -> None:
     if ship.alerted(t):
-        pick(level, "merchant_flee")(ship, t, level.rules)
+        pick(difficulty, "merchant_flee")(ship, t, difficulty.rules)
     else:
         cruise(ship)

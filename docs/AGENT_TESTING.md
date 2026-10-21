@@ -70,7 +70,8 @@ exactly these to ambush the group; it is the template for an agent playing a bui
 
 ## 3. The web build in a headless browser
 
-Each build is deployed at `https://pandazxx.github.io/jenesboat-v2/builds/<name>/` (see the
+Each build is deployed at `https://pandazxx.github.io/jenesboat-v2/builds/<name>/` (the game
+page; `start.html` next to it is the difficulty chooser the build index links to; see the
 [build index](https://pandazxx.github.io/jenesboat-v2/) or `builds.json`). The game prints the
 same `JENESBOAT` events to the browser console, so a Playwright script can drive it:
 

@@ -51,10 +51,11 @@ Three levels: `cadet` (one destroyer, short sonar and memory, never dodges, ligh
 quick reloads, every hit counts), `patrol` (the default: two destroyers that dodge torpedoes,
 the Milestone 2 balance) and `veteran` (three destroyers, longer sonar reach and memory,
 heavier charges, slow reloads, glancing hits rarely detonate). Pick one
-with `--difficulty <level>` (native and headless) or `?difficulty=<level>` on a web build's
-URL; the HUD tag and the objective message name the level and `R` keeps it. A level is a
-set of pluggable AI strategies plus a parameter set: `docs/DIFFICULTY.md` explains the
-framework, `docs/PARAMETERS.md` the numbers.
+on a web build's start page (what the build index links to), with `?difficulty=<name>` on the
+game page's URL, or with `--difficulty <name>` (native and headless); the HUD tag and the
+objective message name it and `R` keeps it. A difficulty is a set of pluggable AI strategies
+plus a parameter set: `docs/DIFFICULTY.md` explains the framework, `docs/PARAMETERS.md` the
+numbers.
 
 ## Weapons
 
@@ -89,10 +90,6 @@ framework, `docs/PARAMETERS.md` the numbers.
 - When cruising, keep in the outter rim to protect the convoy.
 - When under thread, dispatch portion of military force to try to elimitate the thread, while keeping the rest to protect the convoy.
 - Return to formation as soon as the thread is elimiated or lost.
-- A torpedo heard running at the ship is dodged: turn hard to comb its track at full speed
-  (`patrol` and `veteran`; `cadet` escorts never notice). A torpedo that arrives bow-on or
-  stern-on is a glancing blow that may not detonate, so shots down the throat of a charging
-  destroyer are poor shots.
 
 ## Development
 

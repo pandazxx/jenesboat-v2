@@ -1,5 +1,6 @@
-"""The difficulty framework: levels are data, strategies plug into slots, the world runs on
-its level's rules, and a hunt can be started at a chosen level from every entry point."""
+"""The difficulty framework: difficulties are data, strategies plug into slots, the world runs
+on its difficulty's rules, and a hunt can be started at a chosen difficulty from every entry
+point."""
 
 from __future__ import annotations
 
@@ -63,13 +64,13 @@ class FakeBridge:
 
 
 def test_levels_are_named_data_and_the_default_is_patrol():
-    assert difficulty.LEVEL_NAMES == ("cadet", "patrol", "veteran")
-    assert difficulty.level().name == difficulty.DEFAULT_LEVEL == "patrol"
-    assert difficulty.level("veteran") is P.VETERAN
-    for name, level in P.LEVELS.items():
+    assert difficulty.DIFFICULTY_NAMES == ("cadet", "patrol", "veteran")
+    assert difficulty.get().name == difficulty.DEFAULT_DIFFICULTY == "patrol"
+    assert difficulty.get("veteran") is P.VETERAN
+    for name, level in P.DIFFICULTIES.items():
         assert level.name == name and level.title and level.description
     with pytest.raises(KeyError, match="unknown difficulty 'ace'"):
-        difficulty.level("ace")
+        difficulty.get("ace")
     assert "patrol:" in difficulty.describe()
 
 
@@ -77,7 +78,7 @@ def test_every_level_names_registered_strategies():
     registry = difficulty.available()
     assert set(registry) == set(difficulty.SLOTS)
     assert set(registry) == {"escort_search", "escort_evade", "merchant_flee"}
-    for level in P.LEVELS.values():
+    for level in P.DIFFICULTIES.values():
         difficulty.check(level)
         for slot in difficulty.SLOTS:
             assert getattr(level.strategies, slot) in registry[slot]
@@ -87,10 +88,10 @@ def test_every_level_names_registered_strategies():
 
 def test_a_level_with_an_unknown_strategy_is_rejected_when_checked():
     bad = replace(P.PATROL, name="bad", strategies=replace(P.Strategies(), escort_evade="jump"))
-    with pytest.raises(LookupError, match="level 'bad': no strategy 'jump' for slot 'escort_"):
+    with pytest.raises(LookupError, match="difficulty 'bad': no strategy 'jump' for slot"):
         difficulty.check(bad)
     with pytest.raises(LookupError):
-        hunting_scenario(1, level=bad)
+        hunting_scenario(1, difficulty=bad)
 
 
 def test_registering_needs_a_known_slot_and_a_free_name():
@@ -120,10 +121,12 @@ def test_patrol_is_the_base_sheet_and_the_other_levels_differ_in_the_documented_
 
 def test_the_scenario_follows_the_level():
     for name, escorts in (("cadet", 1), ("patrol", 2), ("veteran", 3)):
-        world = hunting_scenario(7, level=difficulty.level(name))
+        world = hunting_scenario(7, difficulty=difficulty.get(name))
         destroyers = [s for s in world.ships if s.kind == "military"]
-        assert world.level.name == name and len(destroyers) == escorts
-        assert world.player.tubes.params.reload_time == P.LEVELS[name].rules.torpedo.reload_time
+        assert world.difficulty.name == name and len(destroyers) == escorts
+        assert (
+            world.player.tubes.params.reload_time == P.DIFFICULTIES[name].rules.torpedo.reload_time
+        )
         assert all(d.escort.charges == world.rules.depth_charge.magazine for d in destroyers)
         assert world.snapshot()["difficulty"] == name
     assert len([s for s in hunting_scenario(7, escorts=0).ships if s.kind == "military"]) == 0
@@ -140,13 +143,13 @@ def test_three_escorts_get_three_different_stations():
 
 def test_a_world_built_by_hand_runs_on_the_default_level():
     world = World(width=100.0, height=100.0, player=hunting_scenario(1).player)
-    assert world.level is P.PATROL and world.rules is P.PATROL.rules
+    assert world.difficulty is P.PATROL and world.rules is P.PATROL.rules
 
 
 def test_the_level_changes_what_the_escort_hears_and_how_long_it_remembers():
-    def hunt(level):
+    def hunt(chosen):
         """The boat submerged 1.2 km off the bow of destroyer-1, stopped."""
-        world = hunting_scenario(4, level=level)
+        world = hunting_scenario(4, difficulty=chosen)
         d = world.ship("destroyer-1")
         sub = world.player
         sub.x, sub.y = project(d.x, d.y, d.heading, 1_200.0)
@@ -172,15 +175,15 @@ def test_the_level_changes_what_the_escort_hears_and_how_long_it_remembers():
 
 def test_game_starts_at_the_chosen_level_and_restarts_keep_it(captured):
     game = Game(seed=3, state_interval=float("inf"), difficulty="cadet")
-    assert game.level.name == "cadet" and game.world.level is P.CADET
+    assert game.difficulty.name == "cadet" and game.world.difficulty is P.CADET
     assert game.messages[0][1].startswith("Objective (Cadet):")
     assert game.snapshot()["difficulty"] == "cadet"
     game.apply(Controls(restart=True), 0.1)
     game.apply(Controls(confirm=True), 0.1)
-    assert game.world.level is P.CADET and game.seed == 4
+    assert game.world.difficulty is P.CADET and game.seed == 4
     restart = next(e for e in parsed(captured) if e["event"] == "restart")
     assert restart["difficulty"] == "cadet"
-    assert Game(seed=1, state_interval=float("inf")).level.name == "patrol"
+    assert Game(seed=1, state_interval=float("inf")).difficulty.name == "patrol"
     with pytest.raises(KeyError):
         Game(seed=1, difficulty="ace")
 
