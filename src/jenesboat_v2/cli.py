@@ -14,7 +14,7 @@ from jenesboat_v2.game import Game
 from jenesboat_v2.sim import difficulty
 from jenesboat_v2.sim.vessel import telegraph_by_name
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"  # keep equal to pyproject.toml (tests/test_cli.py checks)
 
 
 def build_parser() -> argparse.ArgumentParser:

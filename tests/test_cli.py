@@ -78,3 +78,13 @@ def test_headless_trace_emits_states(capsys):
     assert main(["--headless", "--seconds", "3", "--trace"]) == 0
     kinds = [e["event"] for e in events_from(capsys.readouterr().out)]
     assert kinds.count("state") == 3
+
+
+def test_cli_version_matches_pyproject():
+    import tomllib
+    from pathlib import Path
+
+    from jenesboat_v2.cli import VERSION
+
+    pyproject = Path(__file__).resolve().parents[1] / "pyproject.toml"
+    assert VERSION == tomllib.load(pyproject.open("rb"))["project"]["version"]
