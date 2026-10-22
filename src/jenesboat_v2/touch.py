@@ -48,10 +48,13 @@ PAD_RIGHT = 195.0
 
 
 class Bridge(Protocol):
-    """What the game needs from the page: numbers in, a call out."""
+    """What the game needs from the page: numbers and strings in, a call out."""
 
     def get(self, name: str) -> float | None:
         """Value of the global ``name`` as a number, ``None`` if missing."""
+
+    def text(self, name: str) -> str | None:
+        """Value of the global ``name`` as a string, ``None`` if missing or not a string."""
 
     def call(self, name: str, *args: Any) -> None:
         """Call the global function ``name``; errors are swallowed."""
@@ -68,6 +71,13 @@ class WindowBridge:
             return float(getattr(self.window, name))
         except Exception:  # noqa: BLE001 - undefined global or a non-number
             return None
+
+    def text(self, name: str) -> str | None:
+        try:
+            value = getattr(self.window, name)
+        except Exception:  # noqa: BLE001 - undefined global
+            return None
+        return value if isinstance(value, str) else None
 
     def call(self, name: str, *args: Any) -> None:
         try:

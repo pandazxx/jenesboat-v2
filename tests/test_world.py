@@ -184,6 +184,7 @@ def test_snapshot_shape():
         "datum",
         "tonnage",
         "bonus",
+        "difficulty",
         "mission",
         "cue",
         "log_nm",

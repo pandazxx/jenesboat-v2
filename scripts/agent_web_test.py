@@ -108,6 +108,12 @@ def main() -> int:
         default=1.0,
         help="device pixel ratio to emulate (2 reproduces a HiDPI laptop screen)",
     )
+    p.add_argument(
+        "--expect-difficulty",
+        default=None,
+        metavar="LEVEL",
+        help="fail unless the game started at this level (e.g. after ?difficulty=veteran)",
+    )
     args = p.parse_args()
     if args.url.startswith("http://localhost:8"):
         print(
@@ -199,7 +205,10 @@ def main() -> int:
         expected = [key for key, _ in taps if key in logged]
         taps_ok = sorted(touched) == sorted(expected) if taps else True
         summary["taps_ok"] = taps_ok
-        summary["ok"] = bool(last) and (moved is None or moved > 1.0) and taps_ok
+        summary["difficulty"] = (last or summary["ready"]).get("difficulty")
+        level_ok = args.expect_difficulty in (None, summary["difficulty"])
+        summary["difficulty_ok"] = level_ok
+        summary["ok"] = bool(last) and (moved is None or moved > 1.0) and taps_ok and level_ok
         _finish(summary, args, page)
         browser.close()
     return 0 if summary["ok"] else 1

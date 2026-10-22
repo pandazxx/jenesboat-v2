@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from jenesboat_v2.sim.geo import project
-from jenesboat_v2.sim.params import HOUR, TYPE_VIIC, SubmarineParams
+from jenesboat_v2.sim.params import G7E, HOUR, TYPE_VIIC, SubmarineParams, TorpedoParams
 from jenesboat_v2.sim.vessel import Vessel, clamp
 from jenesboat_v2.sim.weapons import Torpedo, Tubes
 
@@ -138,6 +138,12 @@ class Submarine(Vessel):
 
 
 def new_submarine(
-    x: float = 0.0, y: float = 0.0, heading: float = 0.0, spec: SubmarineParams = TYPE_VIIC
+    x: float = 0.0,
+    y: float = 0.0,
+    heading: float = 0.0,
+    spec: SubmarineParams = TYPE_VIIC,
+    torpedo: TorpedoParams = G7E,
 ) -> Submarine:
-    return Submarine(params=spec.vessel, spec=spec, x=x, y=y, heading=heading)
+    return Submarine(
+        params=spec.vessel, spec=spec, x=x, y=y, heading=heading, tubes=Tubes(params=torpedo)
+    )

@@ -6,12 +6,12 @@ import math
 import random
 from dataclasses import dataclass, field
 
-from jenesboat_v2.sim import ai, detection
+from jenesboat_v2.sim import ai, detection, difficulty
 from jenesboat_v2.sim import escort as escort_ai
 from jenesboat_v2.sim.detection import Contact
 from jenesboat_v2.sim.escort import Datum, EscortState
 from jenesboat_v2.sim.geo import bearing, clamp, distance, project
-from jenesboat_v2.sim.params import DETECTION, FREIGHTER, KNOT, MERCHANT_AI, ShipType
+from jenesboat_v2.sim.params import FREIGHTER, KNOT, Difficulty, Rules, ShipType
 from jenesboat_v2.sim.submarine import Submarine, new_submarine
 from jenesboat_v2.sim.vessel import Vessel
 from jenesboat_v2.sim.weapons import DepthCharge, Torpedo
@@ -68,7 +68,7 @@ class Ship(Vessel):
         data["alerted"] = self.alert_until > -math.inf
         if self.kind == "military":
             data["mode"] = self.escort.mode
-            data["charges"] = self.escort.charges
+            data["charges"] = max(self.escort.charges, 0)
             data["sonar_m"] = round(self.escort.sonar_range)
         return data
 
@@ -123,8 +123,19 @@ class World:
     depth_charges: list[DepthCharge] = field(default_factory=list)
     next_charge_id: int = 0
     rng: random.Random = field(default_factory=lambda: random.Random(0))
+    difficulty: Difficulty = field(default_factory=difficulty.get)  # what this hunt runs on
+
+    def __post_init__(self) -> None:
+        for ship in self.ships:
+            if ship.kind == "military" and ship.escort.charges < 0:
+                ship.escort.charges = self.rules.depth_charge.magazine
 
     # --- queries ---------------------------------------------------------------------------
+
+    @property
+    def rules(self) -> Rules:
+        """The parameter set of this hunt (see ``sim/params.py``, ``Rules``)."""
+        return self.difficulty.rules
 
     @property
     def active_ships(self) -> list[Ship]:
@@ -245,7 +256,7 @@ class World:
         for ship in self.ships:
             if ship.active:
                 if ship.kind == "merchant":
-                    ai.merchant(ship, self.time)
+                    ai.merchant(ship, self.time, self.difficulty)
             else:
                 ship.set_throttle(0.0)
                 ship.set_rudder(0.0)
@@ -308,10 +319,11 @@ class World:
     def _lookouts(self, dt: float) -> None:
         """Ships that keep the boat in sight for ``spot_time`` raise the alarm."""
         sub = self.player
+        det = self.rules.detection
         for ship in self.active_ships:
-            if detection.ship_sees_sub(sub, ship, self.light):
-                ship.spot_timer = min(ship.spot_timer + dt, DETECTION.spot_time)
-                if ship.spot_timer >= DETECTION.spot_time - 1e-9:
+            if detection.ship_sees_sub(sub, ship, self.light, det):
+                ship.spot_timer = min(ship.spot_timer + dt, det.spot_time)
+                if ship.spot_timer >= det.spot_time - 1e-9:
                     fresh = not ship.alerted(self.time)
                     self.alert_group(
                         sub.x, sub.y, reason="sighted", by=ship.ship_id, quiet=not fresh
@@ -336,7 +348,7 @@ class World:
                 continue
             if not ship.alerted(self.time):
                 newly.append(ship.ship_id)
-            ship.alert(self.time, x, y, MERCHANT_AI.alert_duration)
+            ship.alert(self.time, x, y, self.rules.merchant_ai.alert_duration)
         if newly and not quiet:
             self.emit("alert", reason=reason, by=by, ships=newly)
 
@@ -344,7 +356,8 @@ class World:
         """A merchant has got away once it is beyond the escape range from the boat (the hunt
         area) or off the map, whether or not it ever saw the boat."""
         out = not (0.0 <= ship.x <= self.width and 0.0 <= ship.y <= self.height)
-        far = distance(ship.x, ship.y, self.player.x, self.player.y) > MERCHANT_AI.escape_range
+        escape_range = self.rules.merchant_ai.escape_range
+        far = distance(ship.x, ship.y, self.player.x, self.player.y) > escape_range
         if ship.kind == "merchant" and (out or far):
             ship.escaped = True
             self.emit("escaped", ship=ship.ship_id)
@@ -383,7 +396,8 @@ class World:
             )
         # The others only know which way the torpedo came from.
         tx, ty = project(torpedo.x, torpedo.y, torpedo.heading + 180.0, THREAT_BEHIND_TORPEDO)
-        self.alert_group(tx, ty, "torpedo", by=ship.ship_id, radius=MERCHANT_AI.panic_range)
+        panic = self.rules.merchant_ai.panic_range
+        self.alert_group(tx, ty, "torpedo", by=ship.ship_id, radius=panic)
         escort_ai.report(self, tx, ty, "torpedo", ship.ship_id)
 
     def _run_depth_charges(self, dt: float) -> None:
@@ -427,6 +441,7 @@ class World:
             ),
             "tonnage": self.tonnage,
             "bonus": self.bonus,
+            "difficulty": self.difficulty.name,
             "mission": self.mission(),
             "cue": self.cue(),
             "log_nm": round(self.player_log / 1852.0, 3),

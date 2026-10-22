@@ -19,7 +19,8 @@ just sim --seconds 30 --trace --seed 7 \
   --script '[{"t":0,"throttle":1},{"t":5,"rudder":1},{"t":8,"dive":true},{"t":20,"fire":true}]'
 ```
 
-`--seed` picks the hunt (same seed, same world); `--seconds` is game time before time
+`--seed` picks the hunt (same seed, same world); `--difficulty cadet|patrol|veteran` picks
+the level (`docs/DIFFICULTY.md`; `patrol` when omitted); `--seconds` is game time before time
 compression. Order keys: `throttle` (-1..1) or `telegraph` (`"ahead half"`, `"stop"`, ...),
 `rudder` (-1..1, +1 = 35° starboard, stays until the next order), `dive` (Space: one band
 shallower, or periscope depth from the surface), `deep` (C), `target_depth` (metres), `fire`
@@ -32,10 +33,11 @@ approximate bearing/range/course of the group), `order`, `contact` / `contact_lo
 (`method` is `visual` or `hydrophone`), `alert` (merchants start running; `reason` is `sighted`
 or `torpedo`), `fire`, `fire_refused`, `hit`, `sunk` (with `tonnage`), `torpedo_lost`,
 `escaped`, `mission_end`, `pause`, `restart`, `state` (every second with `--trace`), `final`.
+`ready`, `restart`, `state` and `final` carry `difficulty` (the level name).
 A `state`/`final` payload looks like:
 
 ```json
-{"event":"state","t":30.0,"seed":7,"time_scale":1,"zoom":20.0,
+{"event":"state","t":30.0,"seed":7,"difficulty":"patrol","time_scale":1,"zoom":20.0,
  "player":{"x":20000.0,"y":20000.0,"heading":35.0,"speed_kn":12.1,"throttle":1.0,"telegraph":"AHEAD FLANK","rudder":1.0,
            "depth":12.0,"target_depth":12.0,"surfaced":false,"band":"periscope",
            "battery":0.998,"tubes":{"loaded":3,"reserves":8,"reload":12.0},"can_fire":true},
@@ -64,7 +66,8 @@ exactly these to ambush the group; it is the template for an agent playing a bui
 
 ## 3. The web build in a headless browser
 
-Each build is deployed at `https://pandazxx.github.io/jenesboat-v2/builds/<name>/` (see the
+Each build is deployed at `https://pandazxx.github.io/jenesboat-v2/builds/<name>/` (the game
+page; `start.html` next to it is the difficulty chooser the build index links to; see the
 [build index](https://pandazxx.github.io/jenesboat-v2/) or `builds.json`). The game prints the
 same `JENESBOAT` events to the browser console, so a Playwright script can drive it:
 
@@ -77,7 +80,9 @@ just agent-web-test https://pandazxx.github.io/jenesboat-v2/builds/<name>/ \
 The script waits for the `ready` event (the first load fetches the Python runtime from the
 pygbag CDN and can take a minute), focuses the canvas, holds the given keys for the given
 seconds (each `W` press is one telegraph position, so four presses order AHEAD FLANK), then
-prints and writes (`dist/agent/web.json`) a summary:
+prints and writes (`dist/agent/web.json`) a summary. Append `?difficulty=veteran` to the URL
+to start the build at that level and `--expect-difficulty veteran` to fail unless it did
+(the summary's `difficulty` and `difficulty_ok`; CI's phone step does this):
 
 ```json
 {"ok": true, "ready": {"event":"ready","build":"abc1234", ...},

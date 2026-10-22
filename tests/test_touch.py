@@ -16,7 +16,12 @@ class FakeBridge:
         self.calls: list[tuple] = []
 
     def get(self, name):
-        return self.values.get(name)
+        value = self.values.get(name)
+        return None if isinstance(value, str) else value
+
+    def text(self, name):
+        value = self.values.get(name)
+        return value if isinstance(value, str) else None
 
     def call(self, name, *args):
         self.calls.append((name, *args))

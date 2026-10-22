@@ -103,7 +103,7 @@ def test_time_compression_substeps_the_world(captured):
 def test_restart_makes_a_new_hunt(captured):
     game = Game(seed=5, state_interval=float("inf"))
     first = game.world
-    assert game.messages[0][1].startswith("Objective: sink the 3 merchants")
+    assert game.messages[0][1].startswith("Objective (Patrol): sink the 3 merchants")
     assert game.messages[1][1].startswith("BdU:")
     game.apply(Controls(fire=True), 0.1)
     game.apply(Controls(restart=True), 0.1)

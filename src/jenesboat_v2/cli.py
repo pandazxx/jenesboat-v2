@@ -11,6 +11,7 @@ from collections.abc import Sequence
 from jenesboat_v2 import events
 from jenesboat_v2._build_info import BUILD_ID, GIT_SHA
 from jenesboat_v2.game import Game
+from jenesboat_v2.sim import difficulty
 from jenesboat_v2.sim.vessel import telegraph_by_name
 
 VERSION = "0.1.0"
@@ -28,6 +29,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--dt", type=float, default=0.1, help="headless: simulation step in seconds")
     p.add_argument("--trace", action="store_true", help="headless: emit a state event every second")
     p.add_argument("--seed", type=int, default=None, help="scenario seed (random if omitted)")
+    p.add_argument(
+        "--difficulty",
+        choices=difficulty.DIFFICULTY_NAMES,
+        default=None,
+        help=f"difficulty level (default {difficulty.DEFAULT_DIFFICULTY}): {difficulty.describe()}",
+    )
     p.add_argument(
         "--size",
         default=None,
@@ -60,12 +67,25 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def run_headless(
-    seconds: float, dt: float, script: str | None, trace: bool, seed: int | None = None
+    seconds: float,
+    dt: float,
+    script: str | None,
+    trace: bool,
+    seed: int | None = None,
+    difficulty_name: str | None = None,
 ) -> dict:
     """Simulate ``seconds`` of game time (time compression applies on top of that)."""
     orders = sorted(json.loads(script) if script else [], key=lambda o: o.get("t", 0.0))
-    events.emit("ready", build=BUILD_ID, sha=GIT_SHA, platform="headless", seconds=seconds)
-    game = Game(state_interval=1.0 if trace else math.inf, seed=seed)
+    level = difficulty.get(difficulty_name)
+    events.emit(
+        "ready",
+        build=BUILD_ID,
+        sha=GIT_SHA,
+        platform="headless",
+        seconds=seconds,
+        difficulty=level.name,
+    )
+    game = Game(state_interval=1.0 if trace else math.inf, seed=seed, difficulty=level.name)
     sub = game.world.player
     t = 0.0
     while t < seconds - 1e-9:
@@ -110,7 +130,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"jenesboat-v2 {VERSION} (build {BUILD_ID})")
         return 0
     if args.headless:
-        run_headless(args.seconds, args.dt, args.script, args.trace, args.seed)
+        run_headless(args.seconds, args.dt, args.script, args.trace, args.seed, args.difficulty)
         return 0
     from jenesboat_v2.app import main as app_main
 
@@ -119,6 +139,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         size=parse_size(args.size),
         touch_layout=args.touch,
         screenshot=args.screenshot,
+        difficulty=args.difficulty,
     )
     return 0
 

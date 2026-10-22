@@ -375,7 +375,7 @@ def _draw_hud(rl, game: Game, width: int, height: int, pad: Pad | None) -> None:
     rl.draw_line(left, bottom - 14, left + scale_px, bottom - 14, _color(rl, HUD_DIM))
     rl.draw_text("1 km", left + 4 + scale_px, bottom - 22, 16, _color(rl, HUD_DIM))
 
-    tag = f"build {BUILD_ID}  seed {game.seed}  t={world.time:6.1f}s"
+    tag = f"build {BUILD_ID}  seed {game.seed}  {game.difficulty.title}  t={world.time:6.1f}s"
     tw = rl.measure_text(tag, 16)
     rl.draw_text(tag, right - tw, bottom - 22, 16, _color(rl, HUD_DIM))
 

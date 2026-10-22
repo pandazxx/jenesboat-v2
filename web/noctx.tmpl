@@ -574,7 +574,8 @@ frameborder="1"
     // last called jb_ack().  jb_pad_left / jb_pad_right: CSS px the clusters take at the
     // left and right edges, so the HUD can keep clear of them.  jb_show(...) is called by
     // the game when the prompt, pause state, time compression or legend changes; jb_fit(w, h)
-    // when it wants the canvas buffer resized.
+    // when it wants the canvas buffer resized.  jb_difficulty: the ?difficulty=<name> of the
+    // page URL (cadet, patrol or veteran), which the game reads once at the start.
     (function () {
         const JB_KEYS = ["W", "S", "A", "D", "Q", "SPACE", "C", "F", "T", "MINUS", "EQUAL",
                          "P", "L", "R", "Y", "N", "TIME"];
@@ -585,6 +586,7 @@ frameborder="1"
         const ship = document.getElementById("pad-ship");
         const attack = document.getElementById("pad-attack");
 
+        window.jb_difficulty = new URLSearchParams(window.location.search).get("difficulty") || "";
         window.jb_touch = 0;
         window.jb_held = 0;
         window.jb_taps = 0;
