@@ -39,6 +39,13 @@ def angle_on_bow(target_heading: float, bearing_from_target: float) -> float:
     return angle_diff(bearing_from_target, target_heading)
 
 
+def track_angle(torpedo_heading: float, ship_heading: float) -> float:
+    """How far off the ship's axis a torpedo on this heading meets it, 0 (bow-on or
+    stern-on) to 90 (a beam shot)."""
+    d = abs(angle_diff(torpedo_heading, ship_heading))
+    return min(d, 180.0 - d)
+
+
 def ray_line_crossing(
     px: float, py: float, p_heading: float, qx: float, qy: float, q_heading: float
 ) -> tuple[float, float] | None:

@@ -47,9 +47,10 @@ landscape; in portrait it asks you to turn the phone.
 
 ## Difficulty
 
-Three levels: `cadet` (one destroyer, short sonar and memory, lighter charges, quick
-reloads), `patrol` (the default: two destroyers, the Milestone 2 balance) and `veteran`
-(three destroyers, longer sonar reach and memory, heavier charges, slow reloads). Pick one
+Three levels: `cadet` (one destroyer, short sonar and memory, never dodges, lighter charges,
+quick reloads, every hit counts), `patrol` (the default: two destroyers that dodge torpedoes,
+the Milestone 2 balance) and `veteran` (three destroyers, longer sonar reach and memory,
+heavier charges, slow reloads, glancing hits rarely detonate). Pick one
 on a web build's start page (what the build index links to), with `?difficulty=<name>` on the
 game page's URL, or with `--difficulty <name>` (native and headless); the HUD tag and the
 objective message name it and `R` keeps it. A difficulty is a set of pluggable AI strategies

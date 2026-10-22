@@ -64,6 +64,16 @@ Speed limit by depth: full `max_speed` on the surface, `submerged_speed` once th
 Torpedoes leave the bow on the boat's heading and run straight (no gyro angle in M1). A hit is
 the torpedo point entering the target's hull box after the arming distance.
 
+**Attack angle** (`TORPEDO_HIT`, M3 / #22). The *track angle* is how far off the target's axis
+the torpedo meets it: 90° is a beam shot, 0° bow-on or stern-on. Early-war contact pistols
+failed at grazing angles, so a torpedo arriving at less than `glance_angle` = 30° off the axis
+is a glancing blow: it detonates with probability `glance_chance` (0.5 on the base sheet; 1.0 at
+`cadet`, 0.25 at `veteran`), otherwise it glances off (`glance` event, no damage, the torpedo
+is spent). Either way the ship and its group are alerted as by a hit. The fire-control panel
+shows the track angle (`trk 85`) and says `GLANCE` instead of `FIRE` for such a shot. A
+shot down the throat of a charging destroyer is therefore a coin toss at best, and the
+destroyer is dodging it (below).
+
 The 8.8 cm deck gun (`DECK_GUN_88`: 4 km, one round per 6 s, 200 rounds, ~12 hits per
 freighter) is defined on the sheet for Milestone 2 and cannot be fired yet.
 
@@ -130,10 +140,24 @@ sits still for about 3 minutes after being found: half are lost when deep, all a
 depth. Circling does not help (the prediction stays on the circle's area); what helps is
 leaving the area quietly and changing course, so the track is lost.
 
+**Torpedo evasion** (`TORPEDO_EVASION`, the `comb` strategy of the `escort_evade` slot, M3 /
+#22; `cadet` keeps `none`). An escort hears a running torpedo's screws within `hear_range` =
+1,200 m (a G7a's wake is also seen at its 1,500 m wake range times the ship's lookout factor
+by day). If the torpedo's closest approach, with both holding course and speed, is inside
+`threat_width` = 150 m and comes before the torpedo runs out, the ship reacts after
+`reaction_time` = 5 s: it turns hard to the course that *combs the track*, parallel to the
+torpedo's course but `comb_angle` = 30° off it toward the side of the track the ship is
+already on (running with the torpedo or toward it, whichever is the smaller turn), at full
+speed, until the torpedo has gone by or run out, then carries on with what it was doing.
+A destroyer charging the boat at 20 kn and hearing a G7e at 1.2 km has about 45 s: enough
+to open 100 m or more, and a 10 m beam needs only 7. Fired from inside about 500 m, or at a
+ship that does not hear it in time, a torpedo still hits.
+
 **Escort AI** (`ESCORT_AI`, code in `sim/escort.py`):
 
 | state | behaviour |
 | --- | --- |
+| evading | (any state, `escort_evade = comb`) a torpedo that will pass too close is heard: comb its track at full speed until it has gone by, then resume |
 | formation | hold the station relative to the merchants' centre and route, at the convoy's speed |
 | alarm | a sonar fix, a lookout sighting or a torpedo hit sets the group's *datum* (where the boat is). The convoy is told (merchants within 8 km run) |
 | split | the escorts nearest the datum hunt (`hunters_per_escort` = 1 hunter per 3 escorts, 1 to 2); the rest screen. A lost hunter is replaced from the screens |
@@ -165,7 +189,9 @@ same at every level except for the torpedo reload time, so the difficulty is in 
 | `depth_charge.damage` | 0.3 | 0.4 | 0.5 | hull damage at the edge of the damage radius: 4, 3 or 2 near bursts to lose the boat |
 | `depth_charge.lethal_radius` | 12 m | 12 m | 15 m | veteran patterns are deadly a little further out |
 | `torpedo.reload_time` | 90 s | 120 s | 150 s | the only change to the boat: how soon a second salvo is ready |
-| strategies | `box`, `none`, `zigzag` | same | same | #22 will set `escort_evade = comb` for patrol and veteran |
+| `torpedo_hit.glance_chance` | 1.0 | 0.5 | 0.25 | whether a bow-on or stern-on shot (under 30° off the axis) detonates: every hit counts at cadet |
+| `escort_evade` strategy | `none` | `comb` | `comb` | cadet destroyers never notice a torpedo; the others comb its track (#22) |
+| other strategies | `box`, `zigzag` | same | same | one search and one flee behaviour so far |
 
 `tests/test_params.py::test_escort_balance_relations_hold_at_every_level` runs the balance
 relations against each level's rules, and `tests/test_difficulty.py` pins the ordering of the

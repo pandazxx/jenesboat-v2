@@ -323,7 +323,7 @@ def test_sinking_a_destroyer_is_a_bonus_not_a_merchant_kill():
     d = destroyers(world)[0]
     from jenesboat_v2.sim.weapons import Torpedo
 
-    t = Torpedo(1, d.x - 100.0, d.y, 90.0)
+    t = Torpedo(1, d.x, d.y - 100.0, 0.0)  # a beam shot from 100 m: no time to dodge
     t.run = 400.0
     world.torpedoes.append(t)
     run(world, 30)
