@@ -47,7 +47,7 @@ ALERT = (255, 120, 90, 255)
 PANEL_BG = (6, 18, 36, 200)
 
 TRACK_LENGTH = 12_000.0  # m of projected track drawn ahead of the target
-HUD_TOP = 104  # px reserved for the HUD text at the top
+HUD_TOP = 34  # px reserved for the HUD text at the top
 PANEL_BOTTOM = 150  # px, below the contact panel on the right
 EDGE_MARGIN = 28  # px, where off-screen cue arrows sit
 MINOR_GRID_MAX_ZOOM = 5.0  # m/px; closer than this a 200 m grid is drawn too
@@ -319,35 +319,17 @@ def _draw_hud(rl, game: Game, width: int, height: int, pad: Pad | None) -> None:
     world = game.world
     sub = world.player
     tubes = sub.tubes
-    line1 = (
-        f"HDG {sub.heading:05.1f}   SPD {sub.speed_knots:5.1f} kn   "
-        f"{sub.telegraph_label}   {sub.rudder_label}"
-    )
-    line1b = (
-        f"POS {sub.x / 1000:.2f}E {sub.y / 1000:.2f}N   LOG {world.player_log / 1852:.2f} nm   "
-        f"SUNK {world.tonnage:,} GRT"
-        + (f" (+{world.bonus:,} escort)" if world.bonus else "")
-        + (f"   HULL DAMAGE {sub.damage * 100:.0f}%" if sub.damage > 0 else "")
-    )
-    line2 = (
-        f"DEPTH {sub.depth:5.1f} m -> {sub.target_depth:5.1f} m   {sub.depth_band.upper()}"
-        f"   BATT {sub.battery * 100:3.0f}%"
-    )
-    reload = (
-        f" (reload {tubes.params.reload_time - tubes.reload_timer:3.0f}s)"
-        if tubes.reloading
-        else ""
-    )
     mission = world.mission()
-    line3 = (
-        f"TUBES {tubes.loaded}/{tubes.params.tubes}  RES {tubes.reserves}{reload}   "
-        f"TIME {'PAUSED' if game.paused else f'x{game.time_scale}'}   "
-        f"HUNT {len(mission['sunk'])}/{mission['total']} sunk, {len(mission['escaped'])} away"
+    reload = f" r{tubes.params.reload_time - tubes.reload_timer:.0f}s" if tubes.reloading else ""
+    status = (
+        f"HDG {sub.heading:03.0f}  {sub.speed_knots:.1f}kn  "
+        f"DEPTH {sub.depth:.0f}>{sub.target_depth:.0f}m  BATT {sub.battery * 100:.0f}%  "
+        f"TUBES {tubes.loaded}/{tubes.params.tubes}+{tubes.reserves}{reload}  "
+        f"SUNK {len(mission['sunk'])}/{mission['total']} {world.tonnage + world.bonus:,}GRT  "
+        f"{'PAUSED' if game.paused else f'x{game.time_scale}'}"
+        + (f"  DAMAGE {sub.damage * 100:.0f}%" if sub.damage > 0 else "")
     )
-    rl.draw_text(line1, 10, 10, 20, _color(rl, HUD))
-    rl.draw_text(line2, 10, 34, 20, _color(rl, HUD))
-    rl.draw_text(line3, 10, 58, 20, _color(rl, HUD))
-    rl.draw_text(line1b, 10, 82, 16, _color(rl, HUD_DIM))
+    rl.draw_text(status, 10, 10, 18, _color(rl, HUD))
 
     _draw_contact_panel(rl, game, width)
 
@@ -365,12 +347,6 @@ def _draw_hud(rl, game: Game, width: int, height: int, pad: Pad | None) -> None:
         for i, line in enumerate(lines):
             rl.draw_text(line, left + (0 if i == 0 else 56), y, 16, _color(rl, HUD_DIM))
             y += 18
-    if pad is None:
-        help_line = (
-            "W/S telegraph  A/D rudder  Q midships  SPACE dive  C deep  F fire  T target  "
-            "-/= zoom  1-6 time  P pause  L legend"
-        )
-        rl.draw_text(help_line, left, bottom, 16, _color(rl, HUD_DIM))
     scale_px = int(1000.0 / game.zoom)
     rl.draw_line(left, bottom - 14, left + scale_px, bottom - 14, _color(rl, HUD_DIM))
     rl.draw_text("1 km", left + 4 + scale_px, bottom - 22, 16, _color(rl, HUD_DIM))
@@ -434,6 +410,12 @@ LEGEND = (
     ("dot", DEPTH_CHARGE, "depth charge sinking"),
     ("blur", CUE, "intel / last seen (arrow when off screen)"),
 )
+# Keyboard help, shown under the symbols (touch screens have buttons instead).
+LEGEND_KEYS = (
+    "W/S telegraph   A/D rudder   Q midships",
+    "SPACE dive   C deep   F fire   T next target",
+    "-/= zoom   1-6 time   P pause   L legend",
+)
 LEGEND_WIDTH = 420  # fits the longest row at 14 px
 LEGEND_ROW = 18
 
@@ -441,7 +423,8 @@ LEGEND_ROW = 18
 def _draw_legend(rl, width: int, height: int, pad: Pad | None) -> None:
     """Symbol key in the lower right, above the build tag (L toggles it).  With touch
     buttons up it is centred instead, where no button covers it."""
-    rows = len(LEGEND)
+    keys = LEGEND_KEYS if pad is None else ()
+    rows = len(LEGEND) + len(keys)
     panel_h = LEGEND_ROW * (rows + 1) + 10
     if pad is None:
         x0 = width - LEGEND_WIDTH - 10
@@ -457,6 +440,9 @@ def _draw_legend(rl, width: int, height: int, pad: Pad | None) -> None:
     for kind, rgba, text in LEGEND:
         _draw_swatch(rl, kind, x0 + 20, y + 7, rgba)
         rl.draw_text(text, x0 + 40, y, 14, _color(rl, HUD_DIM))
+        y += LEGEND_ROW
+    for text in keys:
+        rl.draw_text(text, x0 + 8, y, 14, _color(rl, HUD))
         y += LEGEND_ROW
 
 
@@ -512,13 +498,6 @@ def _draw_contact_panel(rl, game: Game, width: int) -> None:
             lead = f"lead {sol.error:+5.0f} m"
             text = f"run {sol.run / 1000:3.1f} km  {sol.time:3.0f} s  {lead}  {when}"
             lines.append((text, LEAD_OK if ok else HUD_DIM))
-        others = [c for c in game.contacts_by_range() if c.ship_id != target.ship_id]
-        for c in others[:4]:
-            how = "sonar" if c.method == HYDROPHONE else "seen"
-            text = f"{c.ship_id}  {c.bearing:03.0f}  {(c.range or 0) / 1000:4.1f} km  {how}"
-            lines.append((text, HYDRO if c.method == HYDROPHONE else HUD_DIM))
-        if others:
-            lines.append(("T: next target", HUD_DIM))
     else:
         lines.append(("no contact", HUD_DIM))
         cue = world.cue()
