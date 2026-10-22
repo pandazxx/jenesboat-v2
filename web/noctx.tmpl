@@ -322,7 +322,7 @@ config = {
         }
         #pad-meta {
             left: max(10px, env(safe-area-inset-left));
-            top: 26vh;
+            top: 34px;  /* the game moves it under the HUD line (jb_meta_top) */
             grid-auto-flow: column;
         }
         #pad-meta button { min-width: 44px; height: 38px; font-size: 13px; }
@@ -592,6 +592,12 @@ frameborder="1"
         window.jb_taps = 0;
         window.jb_pad_left = 0;
         window.jb_pad_right = 0;
+        window.jb_inset_left = 0;
+        window.jb_inset_right = 0;
+        window.jb_meta_top = function (px) {
+            document.getElementById("pad-meta").style.top = px + "px";
+            return true;
+        };
         window.jb_ack = function () { window.jb_taps = 0; };
         // The game asks for a GL buffer of CSS size x devicePixelRatio, so text is sharp on
         // a phone (the runtime leaves the buffer at the CSS size).
@@ -607,10 +613,21 @@ frameborder="1"
             return true;
         };
 
+        const probe = document.createElement("div");
+        probe.style.cssText = "position:fixed;visibility:hidden;pointer-events:none;" +
+            "padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)";
+        document.body.appendChild(probe);
+        window.addEventListener("resize", () => { if (window.jb_touch) measure(); });
+        window.addEventListener("orientationchange", () => setTimeout(measure, 200));
+
         function measure() {
             const w = window.innerWidth;
             window.jb_pad_left = window.jb_touch ? ship.getBoundingClientRect().right : 0;
             window.jb_pad_right = window.jb_touch ? w - attack.getBoundingClientRect().left : 0;
+            // Rounded corners / notch: the part of the screen the game text must avoid.
+            const cs = getComputedStyle(probe);
+            window.jb_inset_left = parseFloat(cs.paddingLeft) || 0;
+            window.jb_inset_right = parseFloat(cs.paddingRight) || 0;
         }
 
         function enable() {

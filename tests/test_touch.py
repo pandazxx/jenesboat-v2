@@ -73,6 +73,17 @@ def test_show_tells_the_page_only_when_something_changed():
     touch.TouchPad(None).show(True, True, 2, True)  # no page: nothing to do
 
 
+def test_insets_are_polled_and_meta_row_placed_once():
+    bridge = FakeBridge(jb_touch=1, jb_inset_left=47.0, jb_inset_right=44.0)
+    pad = touch.TouchPad(bridge)
+    state = pad.poll()
+    assert (state.inset_left, state.inset_right) == (47.0, 44.0)
+    pad.place_meta(33.6)
+    pad.place_meta(33.9)
+    assert bridge.calls == [("jb_meta_top", 34)]
+    touch.TouchPad(None).place_meta(30.0)
+
+
 def test_window_bridge_swallows_missing_globals_and_bad_values():
     class Window:
         jb_touch = 1

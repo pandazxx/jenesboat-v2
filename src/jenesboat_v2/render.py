@@ -47,6 +47,7 @@ ALERT = (255, 120, 90, 255)
 PANEL_BG = (6, 18, 36, 200)
 
 TRACK_LENGTH = 12_000.0  # m of projected track drawn ahead of the target
+META_TOP = 34  # px below the top where the touch pause / time / zoom row starts
 HUD_TOP = 34  # px reserved for the HUD text at the top
 PANEL_BOTTOM = 150  # px, below the contact panel on the right
 EDGE_MARGIN = 28  # px, where off-screen cue arrows sit
@@ -65,6 +66,8 @@ class Pad:
 
     left: float = 0.0
     right: float = 0.0
+    inset_left: float = 0.0  # rounded corners / notch: keep the top text this far in
+    inset_right: float = 0.0
 
 
 class Camera:
@@ -322,16 +325,16 @@ def _draw_hud(rl, game: Game, width: int, height: int, pad: Pad | None) -> None:
     mission = world.mission()
     reload = f" r{tubes.params.reload_time - tubes.reload_timer:.0f}s" if tubes.reloading else ""
     status = (
-        f"HDG {sub.heading:03.0f}  {sub.speed_knots:.1f}kn  "
+        f"HDG {sub.heading:03.0f}  {sub.speed_knots:.1f}kn {sub.telegraph_label}  "
         f"DEPTH {sub.depth:.0f}>{sub.target_depth:.0f}m  BATT {sub.battery * 100:.0f}%  "
         f"TUBES {tubes.loaded}/{tubes.params.tubes}+{tubes.reserves}{reload}  "
         f"SUNK {len(mission['sunk'])}/{mission['total']} {world.tonnage + world.bonus:,}GRT  "
         f"{'PAUSED' if game.paused else f'x{game.time_scale}'}"
         + (f"  DAMAGE {sub.damage * 100:.0f}%" if sub.damage > 0 else "")
     )
-    rl.draw_text(status, 10, 10, 18, _color(rl, HUD))
+    rl.draw_text(status, 10 + (pad.inset_left if pad else 0), 10, 18, _color(rl, HUD))
 
-    _draw_contact_panel(rl, game, width)
+    _draw_contact_panel(rl, game, width - int(pad.inset_right if pad else 0))
 
     # The bottom band: messages above the scale bar and build tag.  With touch buttons up
     # it sits between the two clusters and there is no keyboard help line.

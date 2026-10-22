@@ -274,10 +274,16 @@ async def run(
         controls = read_controls(rl, state, game.time_scale)
         game.apply(controls, dt)
         game.update(dt)
+        pad.place_meta(render.META_TOP / layout.scale)
         pad.show(game.confirming_restart, game.paused, game.time_scale, game.show_legend)
         insets = None
         if state.active:
-            insets = render.Pad(state.pad_left * layout.scale, state.pad_right * layout.scale)
+            insets = render.Pad(
+                state.pad_left * layout.scale,
+                state.pad_right * layout.scale,
+                state.inset_left * layout.scale,
+                state.inset_right * layout.scale,
+            )
         render.draw(rl, game, layout.width, layout.height, insets)
         if screenshot is not None and game.world.time >= SCREENSHOT_AT:
             rl.take_screenshot(screenshot)
