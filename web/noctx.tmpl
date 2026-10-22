@@ -275,6 +275,12 @@ config = {
             -webkit-touch-callout: none;
         }
         body.touch #touch { display: block; }
+        /* long-press must never start a text selection / callout anywhere on a touch screen */
+        body.touch {
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+        }
         #touch .cluster {
             position: absolute;
             display: grid;
@@ -646,6 +652,11 @@ frameborder="1"
             b.addEventListener("lostpointercapture", up);
             b.addEventListener("contextmenu", (e) => e.preventDefault());
         });
+        // Android Chrome can still start a selection on a long press despite user-select:none;
+        // cancel the selection/drag gestures and non-passive touchstart on the buttons.
+        ["selectstart", "dragstart", "contextmenu"].forEach((t) =>
+            pad.addEventListener(t, (e) => e.preventDefault()));
+        pad.addEventListener("touchstart", (e) => e.preventDefault(), { passive: false });
     })();
 
     </script>
