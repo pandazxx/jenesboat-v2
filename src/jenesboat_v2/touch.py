@@ -113,7 +113,6 @@ class TouchPad:
     def __init__(self, bridge: Bridge | None) -> None:
         self.bridge = bridge
         self._shown: tuple | None = None
-        self._meta_top: int | None = None
 
     def poll(self) -> TouchState:
         if self.bridge is None:
@@ -134,14 +133,6 @@ class TouchPad:
             inset_left=self.bridge.get("jb_inset_left") or 0.0,
             inset_right=self.bridge.get("jb_inset_right") or 0.0,
         )
-
-    def place_meta(self, css_top: float) -> None:
-        """Put the pause / time / zoom row ``css_top`` CSS px from the top, under the HUD line."""
-        css_top = round(css_top)
-        if self.bridge is None or css_top == self._meta_top:
-            return
-        self._meta_top = css_top
-        self.bridge.call("jb_meta_top", css_top)
 
     def show(self, confirming: bool, paused: bool, time_scale: int, legend: bool) -> None:
         """Update the button labels (YES/NO prompt, RUN/PAUSE, x1..x32) when they change."""

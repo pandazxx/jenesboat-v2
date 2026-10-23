@@ -275,7 +275,6 @@ async def run(
         controls = read_controls(rl, state, game.time_scale)
         game.apply(controls, dt)
         game.update(dt)
-        pad.place_meta(render.META_TOP / layout.scale)
         pad.show(game.confirming_restart, game.paused, game.time_scale, game.show_legend)
         insets = None
         if state.active:

@@ -52,8 +52,6 @@ STATUS_TOP = 8  # the status column: one attribute per line, down the left edge
 STATUS_LINE = 17
 STATUS_SIZE = 16
 STATUS_LINES = 11
-# Touch row (pause / time / zoom) starts just under the status column.
-META_TOP = STATUS_TOP + STATUS_LINES * STATUS_LINE + 4
 HUD_TOP = 34  # px reserved for the HUD text at the top
 PANEL_BOTTOM = 150  # px, below the contact panel on the right
 EDGE_MARGIN = 28  # px, where off-screen cue arrows sit
