@@ -1,0 +1,13 @@
+{
+  "built_at": "2026-10-23T15:17:32+00:00",
+  "cdn": "https://pygame-web.github.io/archives/0.9/",
+  "kind": "pr",
+  "name": "c89952c",
+  "pr": 33,
+  "pybuild": "3.12",
+  "ref": "topic/32-hud",
+  "run_url": "https://github.com/pandazxx/jenesboat-v2/actions/runs/39976834628",
+  "sha": "c89952c988e330afeceb88e13549b944f4cf048b",
+  "title": "Declutter the HUD (#32)",
+  "url": "https://pandazxx.github.io/jenesboat-v2/builds/c89952c/"
+}
