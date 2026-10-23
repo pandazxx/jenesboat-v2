@@ -332,7 +332,7 @@ def _draw_hud(rl, game: Game, width: int, height: int, pad: Pad | None) -> None:
         f"{'PAUSED' if game.paused else f'x{game.time_scale}'}"
         + (f"  DAMAGE {sub.damage * 100:.0f}%" if sub.damage > 0 else "")
     )
-    rl.draw_text(status, 10 + (pad.inset_left if pad else 0), 10, 18, _color(rl, HUD))
+    rl.draw_text(status, 10 + int(pad.inset_left if pad else 0), 10, 18, _color(rl, HUD))
 
     _draw_contact_panel(rl, game, width - int(pad.inset_right if pad else 0))
 

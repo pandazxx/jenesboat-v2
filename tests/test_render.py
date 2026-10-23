@@ -47,6 +47,8 @@ class FakeRL:
 
             def record(*args):
                 assert len(args) == PYRAY_ARITY[name], f"{name} called with {len(args)} args"
+                if name == "draw_text":  # the real binding rejects float pixel positions
+                    assert all(isinstance(a, int) for a in args[1:4]), f"draw_text{args[1:4]}"
                 self.calls.append(name)
 
             return record
@@ -194,7 +196,7 @@ def test_touch_layout_moves_the_bottom_band_and_centres_the_legend():
     game = Game(seed=1, state_interval=float("inf"))
     game.show_legend = True
     rl = FakeRL()
-    render.draw(rl, game, 976, 450, render.Pad(left=275.0, right=223.0))
+    render.draw(rl, game, 976, 450, render.Pad(275.0, 223.0, inset_left=47.3, inset_right=44.6))
     assert "draw_rectangle" in rl.calls  # the legend panel
     with_keys = draw(game, legend=True)  # 960x540, no pad
     game.show_legend = True
