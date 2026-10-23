@@ -1,5 +1,19 @@
 [
   {
+    "built_at": "2026-10-23T14:16:32+00:00",
+    "cdn": "https://pygame-web.github.io/archives/0.9/",
+    "kind": "pr",
+    "name": "c3f86ec",
+    "pr": 33,
+    "pybuild": "3.12",
+    "ref": "topic/32-hud",
+    "run_url": "https://github.com/pandazxx/jenesboat-v2/actions/runs/39968062836",
+    "sha": "c3f86ec7fdd31c4deb46318085b35abdbc9d3642",
+    "start_url": "builds/c3f86ec/start.html",
+    "title": "Declutter the HUD (#32)",
+    "url": "builds/c3f86ec/"
+  },
+  {
     "built_at": "2026-10-23T13:36:18+00:00",
     "cdn": "https://pygame-web.github.io/archives/0.9/",
     "kind": "pr",
