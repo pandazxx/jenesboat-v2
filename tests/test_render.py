@@ -1,6 +1,9 @@
 """render.draw must run against the pyray API in every game state (no window needed: a stub
 records the calls, so typos in attribute names or bad arithmetic show up here, not in CI)."""
 
+from pathlib import Path
+from types import SimpleNamespace
+
 from jenesboat_v2 import render
 from jenesboat_v2.game import Controls, Game
 from jenesboat_v2.sim import default_world
@@ -221,3 +224,49 @@ def test_long_messages_wrap_to_the_band():
     assert len(narrow) > 1 and " ".join(narrow) == objective
     assert all(FakeRL().measure_text(line, 16) <= 400 for line in narrow)
     assert render._wrap(FakeRL(), "", 16, 100) == []
+
+
+class FontRL(FakeRL):
+    """FakeRL with the TrueType text calls; records every drawn string."""
+
+    class _Font:
+        texture = object()
+
+    def __init__(self):
+        super().__init__()
+        self.drawn: list[tuple[str, float, float]] = []
+
+    def load_font_ex(self, path, size, codepoints, count):
+        assert Path(path).is_file() and codepoints is None and count == 0
+        return self._Font()
+
+    def is_font_valid(self, font):
+        return True
+
+    def set_texture_filter(self, texture, mode):
+        self.calls.append("set_texture_filter")
+
+    def draw_text_ex(self, font, text, pos, size, spacing, color):
+        self.drawn.append((text, pos[0], size))
+        self.calls.append("draw_text_ex")
+
+    def measure_text_ex(self, font, text, size, spacing):
+        return SimpleNamespace(x=len(text) * size * 0.6, y=size)
+
+
+def test_bundled_font_is_used_for_all_text_and_status_column_stays_narrow():
+    assert render.FONT_FILE.is_file()
+    game = Game(seed=1, state_interval=float("inf"))
+    game.show_legend = True
+    rl = FontRL()
+    render.load_font(rl)
+    try:
+        render.draw(rl, game, 976, 450, render.Pad(275.0, 223.0, 47.0, 44.0))
+    finally:
+        render._font = None
+    assert "draw_text" not in rl.calls and "draw_text_ex" in rl.calls
+    column = [(t, x, size) for t, x, size in rl.drawn if x == 10 + 47]
+    assert len(column) >= render.STATUS_LINES
+    width = max(len(t) * size * 0.6 for t, _, size in column[: render.STATUS_LINES])
+    assert width <= 976 / 5
+    assert any(t.startswith("RUDDER") for t, _, _ in column)

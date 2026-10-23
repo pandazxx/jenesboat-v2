@@ -245,6 +245,7 @@ async def run(
     pad = touch.TouchPad(bridge)
     fit = BufferFit(bridge)
     layout: Layout | None = None
+    render.load_font(rl)
     rl.set_target_fps(60)
 
     level = get_difficulty(difficulty if difficulty is not None else page_difficulty(bridge))
