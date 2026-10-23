@@ -154,6 +154,27 @@ class DepthChargeParams:
 
 
 @dataclass(frozen=True)
+class TorpedoEvasionParams:
+    """How an escort notices a running torpedo and gets out of its way (the ``comb`` strategy
+    of the ``escort_evade`` slot, ``sim/escort.py``)."""
+
+    hear_range: float  # m, a running torpedo's screws are heard this far on the hydrophones
+    reaction_time: float  # s between hearing it and the helm answering
+    threat_width: float  # m, a torpedo that will pass closer than this is dodged
+    comb_angle: float  # deg off the torpedo's course the ship steers to open the distance
+
+
+@dataclass(frozen=True)
+class TorpedoHitParams:
+    """What happens when a torpedo reaches a hull.  Early-war contact pistols failed at
+    grazing angles: a torpedo meeting the hull nearly along the ship's axis (bow-on or
+    stern-on) is a glancing blow that may not detonate."""
+
+    glance_angle: float  # deg off the ship's axis below which the hit is a glancing blow
+    glance_chance: float  # 0..1, the chance a glancing blow still detonates
+
+
+@dataclass(frozen=True)
 class EscortAIParams:
     hunters_per_escort: int  # one hunter per this many escorts (at least one), max_hunters cap
     max_hunters: int
@@ -313,6 +334,18 @@ SONAR_ASDIC = SonarParams(
     position_error=40.0,
 )
 
+TORPEDO_EVASION = TorpedoEvasionParams(
+    hear_range=1_200.0,
+    reaction_time=5.0,
+    threat_width=150.0,
+    comb_angle=30.0,
+)
+
+TORPEDO_HIT = TorpedoHitParams(
+    glance_angle=30.0,
+    glance_chance=0.5,
+)
+
 DEPTH_CHARGE = DepthChargeParams(
     sink_rate=3.0,
     lethal_radius=12.0,
@@ -402,6 +435,8 @@ class Rules:
     sonar: SonarParams = SONAR_ASDIC
     depth_charge: DepthChargeParams = DEPTH_CHARGE
     escort_ai: EscortAIParams = ESCORT_AI
+    evasion: TorpedoEvasionParams = TORPEDO_EVASION
+    torpedo_hit: TorpedoHitParams = TORPEDO_HIT
     scenario: ScenarioParams = SCENARIO
 
 
@@ -411,7 +446,7 @@ class Strategies:
     registered in ``sim/difficulty.py``; the defaults are the M1/M2 behaviours."""
 
     escort_search: str = "box"  # how a hunter sweeps for a boat whose track has gone stale
-    escort_evade: str = "none"  # what an escort does about a torpedo running at it
+    escort_evade: str = "none"  # what an escort does about a torpedo running at it (comb: dodge)
     merchant_flee: str = "zigzag"  # how an alerted merchant runs
 
 
@@ -429,39 +464,41 @@ class Difficulty:
 CADET = Difficulty(
     name="cadet",
     title="Cadet",
-    description="one destroyer with a short sonar and a short memory, lighter charges, "
-    "quick reloads",
+    description="one destroyer with a short sonar and a short memory that never dodges, "
+    "lighter charges, quick reloads, every hit counts",
     rules=Rules(
         torpedo=replace(G7E, reload_time=90.0),
         sonar=replace(SONAR_ASDIC, range=2_400.0),
         depth_charge=replace(DEPTH_CHARGE, damage=0.3),
         escort_ai=replace(ESCORT_AI, lose_track_time=180.0),
+        torpedo_hit=replace(TORPEDO_HIT, glance_chance=1.0),
         scenario=ScenarioParams(escorts=1),
     ),
-    strategies=Strategies(),
+    strategies=Strategies(escort_evade="none"),
 )
 
 PATROL = Difficulty(
     name="patrol",
     title="Patrol",
-    description="two destroyers, the Milestone 2 balance (the default)",
+    description="two destroyers that dodge torpedoes, the Milestone 2 balance (the default)",
     rules=Rules(),
-    strategies=Strategies(),
+    strategies=Strategies(escort_evade="comb"),
 )
 
 VETERAN = Difficulty(
     name="veteran",
     title="Veteran",
-    description="three destroyers with longer sonar reach and memory, heavier charges, "
-    "slow reloads",
+    description="three destroyers with longer sonar reach and memory that dodge torpedoes, "
+    "heavier charges, slow reloads, glancing hits rarely detonate",
     rules=Rules(
         torpedo=replace(G7E, reload_time=150.0),
         sonar=replace(SONAR_ASDIC, range=3_600.0),
         depth_charge=replace(DEPTH_CHARGE, damage=0.5, lethal_radius=15.0),
         escort_ai=replace(ESCORT_AI, lose_track_time=480.0),
+        torpedo_hit=replace(TORPEDO_HIT, glance_chance=0.25),
         scenario=ScenarioParams(escorts=3),
     ),
-    strategies=Strategies(),
+    strategies=Strategies(escort_evade="comb"),
 )
 
 DIFFICULTIES: dict[str, Difficulty] = {d.name: d for d in (CADET, PATROL, VETERAN)}

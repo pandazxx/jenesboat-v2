@@ -6,10 +6,11 @@ same hunt is played easier or harder.
 
 ## What the player gets
 
-- Three difficulties. `patrol` is the default and is the Milestone 2 game. `cadet` is easier
-  (one destroyer, deaf and forgetful). `veteran` is harder (three destroyers that hear
-  further and keep hunting longer). The numbers are in `docs/PARAMETERS.md`, "Difficulty
-  levels".
+- Three difficulties. `patrol` is the default: the Milestone 2 game, plus destroyers that
+  dodge torpedoes (#22). `cadet` is easier (one destroyer, deaf and forgetful, never dodges,
+  every hit counts). `veteran` is harder (three destroyers that hear further and keep
+  hunting longer, and bow-on torpedoes rarely detonate). The numbers are in
+  `docs/PARAMETERS.md`, "Difficulty levels".
 - The difficulty is chosen before the hunt starts: on the build's start page (three
   buttons), on the game URL (`?difficulty=veteran`), or with `--difficulty` on the command
   line. The whole hunt runs on it; `R` (new hunt) keeps it.
@@ -38,9 +39,10 @@ VETERAN = Difficulty(
         sonar=replace(SONAR_ASDIC, range=3_600.0),
         depth_charge=replace(DEPTH_CHARGE, damage=0.5, lethal_radius=15.0),
         escort_ai=replace(ESCORT_AI, lose_track_time=480.0),
+        torpedo_hit=replace(TORPEDO_HIT, glance_chance=0.25),
         scenario=ScenarioParams(escorts=3),
     ),
-    strategies=Strategies(),  # the behaviours: the base ones (#22 adds escort_evade="comb")
+    strategies=Strategies(escort_evade="comb"),  # the behaviours: dodge torpedoes (#22)
 )
 ```
 
@@ -152,7 +154,7 @@ whatever its name, so the caller does not care which one it got:
 | slot | called as | strategies today | chosen by |
 | --- | --- | --- | --- |
 | `escort_search` | `(world, ship, p: EscortAIParams) -> None`: steer a hunter whose fix on the boat is older than `FRESH_DATUM` | `box`: a square around the last fix that widens with time | all: `box` |
-| `escort_evade` | `(world, ship, dt) -> bool`: react to torpedoes in the water; `True` while dodging (the ship's normal behaviour is skipped that tick) | `none`: never notices a torpedo (M2) | all: `none` until #22 (`comb` for `patrol` and `veteran`) |
+| `escort_evade` | `(world, ship, dt) -> bool`: react to torpedoes in the water; `True` while dodging (the ship's normal behaviour is skipped that tick) | `none`: never notices a torpedo (M2); `comb`: hear a torpedo that will pass too close and turn hard to comb its track at full speed until it has gone by (#22) | `cadet`: `none`; `patrol`, `veteran`: `comb` |
 | `merchant_flee` | `(ship, t, rules: Rules) -> None`: steer an alerted merchant; `ship.shelter` is set when an escort covers it | `zigzag`: run away zigzagging, or for the spot behind an escort | all: `zigzag` |
 
 Why a registry rather than importing the functions into the difficulty table: the table in
@@ -173,6 +175,15 @@ base game.
 
 The CI smoke test's phone step loads the game page with `?difficulty=veteran` and fails
 unless the game reports that difficulty, so the web path is checked on every build.
+
+## The first optional strategy (#22)
+
+`escort_evade = "comb"` shows the two halves of the framework together. The behaviour
+(dodging a heard torpedo) is a strategy that `cadet` leaves off. The rule it pairs with (a
+torpedo arriving bow-on or stern-on is a glancing blow that may not detonate) is a parameter
+block, `TorpedoHitParams`, whose `glance_chance` the difficulties dial from 1.0 (`cadet`,
+every hit counts) through 0.5 (`patrol`) to 0.25 (`veteran`). Details in
+`docs/PARAMETERS.md`, "Torpedo evasion" and "Attack angle".
 
 ## How to extend
 

@@ -6,7 +6,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-from jenesboat_v2.sim.geo import project, ray_line_crossing
+from jenesboat_v2.sim.geo import project, ray_line_crossing, track_angle
 from jenesboat_v2.sim.params import DEPTH_CHARGE, G7E, DepthChargeParams, TorpedoParams
 
 
@@ -114,12 +114,14 @@ class Solution:
     target_x: float  # where the target will be when the torpedo reaches the crossing
     target_y: float
     error: float
+    track_angle: float = 90.0  # deg off the target's axis the torpedo meets it (90 = beam)
 
     def snapshot(self) -> dict:
         return {
             "run": round(self.run, 0),
             "time": round(self.time, 1),
             "error": round(self.error, 0),
+            "track_angle": round(self.track_angle, 0),
         }
 
 
@@ -145,7 +147,7 @@ def solution(
     travel = t_speed * time
     cx, cy = project(sx, sy, s_heading, run)
     px, py = project(tx, ty, t_heading, travel)
-    return Solution(cx, cy, run, time, px, py, along - travel)
+    return Solution(cx, cy, run, time, px, py, along - travel, track_angle(s_heading, t_heading))
 
 
 @dataclass

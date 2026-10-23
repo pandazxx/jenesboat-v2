@@ -497,10 +497,23 @@ def _draw_contact_panel(rl, game: Game, width: int) -> None:
             lines.append(("no solution: tracks do not cross in range", HUD_DIM))
         else:
             ok = abs(sol.error) <= ship.params.length / 2
-            when = "FIRE" if ok else ("wait" if sol.error > 0 else "late")
+            glancing = sol.track_angle < world.rules.torpedo_hit.glance_angle
+            when = (
+                "GLANCE"
+                if ok and glancing
+                else "FIRE"
+                if ok
+                else "wait"
+                if sol.error > 0
+                else "late"
+            )
             lead = f"lead {sol.error:+5.0f} m"
-            text = f"run {sol.run / 1000:3.1f} km  {sol.time:3.0f} s  {lead}  {when}"
-            lines.append((text, LEAD_OK if ok else HUD_DIM))
+            text = (
+                f"run {sol.run / 1000:3.1f} km  {sol.time:3.0f} s  {lead}  "
+                f"trk {sol.track_angle:2.0f}  {when}"
+            )
+            color = LEAD_BAD if ok and glancing else LEAD_OK if ok else HUD_DIM
+            lines.append((text, color))
     else:
         lines.append(("no contact", HUD_DIM))
         cue = world.cue()
