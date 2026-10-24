@@ -1,5 +1,19 @@
 [
   {
+    "built_at": "2026-10-24T06:51:10+00:00",
+    "cdn": "https://pygame-web.github.io/archives/0.9/",
+    "kind": "commit",
+    "name": "2f8a6ec",
+    "pr": null,
+    "pybuild": "3.12",
+    "ref": "master",
+    "run_url": "https://github.com/pandazxx/jenesboat-v2/actions/runs/40071747308",
+    "sha": "2f8a6ece1e9cc7ba20a1b9a5528aaa87f7672f73",
+    "start_url": "builds/2f8a6ec/start.html",
+    "title": "Merge pull request #33 from pandazxx/topic/32-hud",
+    "url": "builds/2f8a6ec/"
+  },
+  {
     "built_at": "2026-10-23T15:17:32+00:00",
     "cdn": "https://pygame-web.github.io/archives/0.9/",
     "kind": "pr",
