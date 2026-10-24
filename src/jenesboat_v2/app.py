@@ -245,6 +245,7 @@ async def run(
     pad = touch.TouchPad(bridge)
     fit = BufferFit(bridge)
     layout: Layout | None = None
+    render.load_font(rl)
     rl.set_target_fps(60)
 
     level = get_difficulty(difficulty if difficulty is not None else page_difficulty(bridge))
@@ -277,7 +278,12 @@ async def run(
         pad.show(game.confirming_restart, game.paused, game.time_scale, game.show_legend)
         insets = None
         if state.active:
-            insets = render.Pad(state.pad_left * layout.scale, state.pad_right * layout.scale)
+            insets = render.Pad(
+                state.pad_left * layout.scale,
+                state.pad_right * layout.scale,
+                state.inset_left * layout.scale,
+                state.inset_right * layout.scale,
+            )
         render.draw(rl, game, layout.width, layout.height, insets)
         if screenshot is not None and game.world.time >= SCREENSHOT_AT:
             rl.take_screenshot(screenshot)

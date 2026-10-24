@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from pathlib import Path
 
 from jenesboat_v2._build_info import BUILD_ID
 from jenesboat_v2.game import Game
@@ -47,10 +48,49 @@ ALERT = (255, 120, 90, 255)
 PANEL_BG = (6, 18, 36, 200)
 
 TRACK_LENGTH = 12_000.0  # m of projected track drawn ahead of the target
-HUD_TOP = 104  # px reserved for the HUD text at the top
+STATUS_TOP = 8  # the status column: one attribute per line, down the left edge
+STATUS_LINE = 17
+STATUS_SIZE = 16
+STATUS_LINES = 11
+HUD_TOP = 34  # px reserved for the HUD text at the top
 PANEL_BOTTOM = 150  # px, below the contact panel on the right
 EDGE_MARGIN = 28  # px, where off-screen cue arrows sit
 MINOR_GRID_MAX_ZOOM = 5.0  # m/px; closer than this a 200 m grid is drawn too
+
+
+FONT_FILE = Path(__file__).parent / "assets" / "DejaVuSansMono.ttf"
+FONT_LOAD_SIZE = 40  # rasterised once this big, then drawn smaller with bilinear filtering
+FONT_SCALE = 0.78  # a size asked for below is drawn at this fraction (the font is compact)
+TEXTURE_FILTER_BILINEAR = 1  # raylib's enum value, the same in every version
+_font = None
+
+
+def load_font(rl) -> None:
+    """Use the bundled TrueType font for all text (the raylib default is blocky and wide).
+    Without this call, or if the file will not load, the default font is used."""
+    global _font
+    try:
+        font = rl.load_font_ex(str(FONT_FILE), FONT_LOAD_SIZE, None, 0)
+        valid = getattr(rl, "is_font_valid", None) or getattr(rl, "is_font_ready", None)
+        if valid is not None and not valid(font):
+            return
+        rl.set_texture_filter(font.texture, TEXTURE_FILTER_BILINEAR)
+        _font = font
+    except Exception:  # noqa: BLE001 - keep the default font rather than crash
+        _font = None
+
+
+def _text(rl, text: str, x: int, y: int, size: int, color) -> None:
+    if _font is None:
+        rl.draw_text(text, x, y, size, color)
+    else:
+        rl.draw_text_ex(_font, text, rl.Vector2(x, y), size * FONT_SCALE, 0.0, color)
+
+
+def _measure(rl, text: str, size: int) -> int:
+    if _font is None:
+        return rl.measure_text(text, size)
+    return int(rl.measure_text_ex(_font, text, size * FONT_SCALE, 0.0).x)
 
 
 def _color(rl, rgba):
@@ -65,6 +105,8 @@ class Pad:
 
     left: float = 0.0
     right: float = 0.0
+    inset_left: float = 0.0  # rounded corners / notch: keep the top text this far in
+    inset_right: float = 0.0
 
 
 class Camera:
@@ -152,7 +194,7 @@ def _grid_lines(rl, cam: Camera, step: float, rgba, label: bool) -> None:
         rl.draw_line(int(sx), 0, int(sx), cam.height, _color(rl, rgba))
         if label:
             km = f"{gx / 1000:.0f}"
-            rl.draw_text(km, int(sx) + 3, HUD_TOP, 12, _color(rl, GRID_LABEL))
+            _text(rl, km, int(sx) + 3, HUD_TOP, 12, _color(rl, GRID_LABEL))
         gx += step
     y0 = math.floor((cam.cy - cam.height / 2 * cam.zoom) / step) * step
     y1 = cam.cy + cam.height / 2 * cam.zoom
@@ -162,8 +204,8 @@ def _grid_lines(rl, cam: Camera, step: float, rgba, label: bool) -> None:
         rl.draw_line(0, int(sy), cam.width, int(sy), _color(rl, rgba))
         if label and PANEL_BOTTOM < sy < cam.height - 70:
             km = f"{gy / 1000:.0f}"
-            tw = rl.measure_text(km, 12)
-            rl.draw_text(km, cam.width - tw - 3, int(sy) - 14, 12, _color(rl, GRID_LABEL))
+            tw = _measure(rl, km, 12)
+            _text(rl, km, cam.width - tw - 3, int(sy) - 14, 12, _color(rl, GRID_LABEL))
         gy += step
 
 
@@ -196,7 +238,7 @@ def _draw_cue(rl, cam: Camera, cue: dict | None) -> None:
         tx, ty = project(cue["x"], cue["y"], cue["course"], radius_m * 1.5)
         stx, sty = cam.to_screen(tx, ty)
         rl.draw_line_ex(rl.Vector2(sx, sy), rl.Vector2(stx, sty), 1.0, _color(rl, CUE))
-        rl.draw_text(text, int(sx) + 8, int(sy) + 8, 14, _color(rl, CUE))
+        _text(rl, text, int(sx) + 8, int(sy) + 8, 14, _color(rl, CUE))
         return
     # Off-screen: an arrow on the edge of the map area, pointing the way.
     dx, dy = sx - cam.width / 2, sy - cam.height / 2
@@ -213,10 +255,10 @@ def _draw_cue(rl, cam: Camera, cue: dict | None) -> None:
     rl.draw_line_ex(left, tip, 2.0, _color(rl, CUE))
     rl.draw_line_ex(right, tip, 2.0, _color(rl, CUE))
     rl.draw_line_ex(left, right, 2.0, _color(rl, CUE))
-    tw = rl.measure_text(text, 14)
+    tw = _measure(rl, text, 14)
     lx = min(max(int(ex) - tw // 2, 4), cam.width - tw - 4)
     ly = int(ey) + (14 if uy < 0 else -30)
-    rl.draw_text(text, lx, ly, 14, _color(rl, CUE))
+    _text(rl, text, lx, ly, 14, _color(rl, CUE))
 
 
 def _draw_blur(rl, sx: float, sy: float, radius: float, rgba) -> None:
@@ -319,37 +361,27 @@ def _draw_hud(rl, game: Game, width: int, height: int, pad: Pad | None) -> None:
     world = game.world
     sub = world.player
     tubes = sub.tubes
-    line1 = (
-        f"HDG {sub.heading:05.1f}   SPD {sub.speed_knots:5.1f} kn   "
-        f"{sub.telegraph_label}   {sub.rudder_label}"
-    )
-    line1b = (
-        f"POS {sub.x / 1000:.2f}E {sub.y / 1000:.2f}N   LOG {world.player_log / 1852:.2f} nm   "
-        f"SUNK {world.tonnage:,} GRT"
-        + (f" (+{world.bonus:,} escort)" if world.bonus else "")
-        + (f"   HULL DAMAGE {sub.damage * 100:.0f}%" if sub.damage > 0 else "")
-    )
-    line2 = (
-        f"DEPTH {sub.depth:5.1f} m -> {sub.target_depth:5.1f} m   {sub.depth_band.upper()}"
-        f"   BATT {sub.battery * 100:3.0f}%"
-    )
-    reload = (
-        f" (reload {tubes.params.reload_time - tubes.reload_timer:3.0f}s)"
-        if tubes.reloading
-        else ""
-    )
     mission = world.mission()
-    line3 = (
-        f"TUBES {tubes.loaded}/{tubes.params.tubes}  RES {tubes.reserves}{reload}   "
-        f"TIME {'PAUSED' if game.paused else f'x{game.time_scale}'}   "
-        f"HUNT {len(mission['sunk'])}/{mission['total']} sunk, {len(mission['escaped'])} away"
-    )
-    rl.draw_text(line1, 10, 10, 20, _color(rl, HUD))
-    rl.draw_text(line2, 10, 34, 20, _color(rl, HUD))
-    rl.draw_text(line3, 10, 58, 20, _color(rl, HUD))
-    rl.draw_text(line1b, 10, 82, 16, _color(rl, HUD_DIM))
+    reload = f" r{tubes.params.reload_time - tubes.reload_timer:.0f}s" if tubes.reloading else ""
+    hull = f"HULL {100 - sub.damage * 100:.0f}%" if sub.damage > 0 else "HULL OK"
+    status = [
+        f"HDG {sub.heading:03.0f}",
+        f"SPD {sub.speed_knots:.1f} kn",
+        sub.telegraph_label,
+        sub.rudder_label,
+        f"DEPTH {sub.depth:.0f}>{sub.target_depth:.0f} m",
+        f"BATT {sub.battery * 100:.0f}%",
+        f"TUBES {tubes.loaded}/{tubes.params.tubes}+{tubes.reserves}{reload}",
+        f"SUNK {len(mission['sunk'])}/{mission['total']}",
+        f"{world.tonnage + world.bonus:,} GRT",
+        hull,
+        "PAUSED" if game.paused else f"TIME x{game.time_scale}",
+    ]
+    x = 10 + int(pad.inset_left if pad else 0)
+    for i, line in enumerate(status):
+        _text(rl, line, x, STATUS_TOP + i * STATUS_LINE, STATUS_SIZE, _color(rl, HUD))
 
-    _draw_contact_panel(rl, game, width)
+    _draw_contact_panel(rl, game, width - int(pad.inset_right if pad else 0))
 
     # The bottom band: messages above the scale bar and build tag.  With touch buttons up
     # it sits between the two clusters and there is no keyboard help line.
@@ -363,43 +395,37 @@ def _draw_hud(rl, game: Game, width: int, height: int, pad: Pad | None) -> None:
     y = bottom - 18 * (sum(len(lines) for lines in rows) + 1)
     for lines in rows:
         for i, line in enumerate(lines):
-            rl.draw_text(line, left + (0 if i == 0 else 56), y, 16, _color(rl, HUD_DIM))
+            _text(rl, line, left + (0 if i == 0 else 56), y, 16, _color(rl, HUD_DIM))
             y += 18
-    if pad is None:
-        help_line = (
-            "W/S telegraph  A/D rudder  Q midships  SPACE dive  C deep  F fire  T target  "
-            "-/= zoom  1-6 time  P pause  L legend"
-        )
-        rl.draw_text(help_line, left, bottom, 16, _color(rl, HUD_DIM))
     scale_px = int(1000.0 / game.zoom)
     rl.draw_line(left, bottom - 14, left + scale_px, bottom - 14, _color(rl, HUD_DIM))
-    rl.draw_text("1 km", left + 4 + scale_px, bottom - 22, 16, _color(rl, HUD_DIM))
+    _text(rl, "1 km", left + 4 + scale_px, bottom - 22, 16, _color(rl, HUD_DIM))
 
     tag = f"build {BUILD_ID}  seed {game.seed}  {game.difficulty.title}  t={world.time:6.1f}s"
-    tw = rl.measure_text(tag, 16)
-    rl.draw_text(tag, right - tw, bottom - 22, 16, _color(rl, HUD_DIM))
+    tw = _measure(rl, tag, 16)
+    _text(rl, tag, right - tw, bottom - 22, 16, _color(rl, HUD_DIM))
 
     touch = pad is not None
     if game.confirming_restart:
         answer = "YES / NO" if touch else "Y / R: yes    N: no"
         text = f"Abandon this hunt and start a new one?   {answer}"
-        tw = rl.measure_text(text, 24)
+        tw = _measure(rl, text, 24)
         rl.draw_rectangle(
             (width - tw) // 2 - 12, height // 2 - 52, tw + 24, 40, _color(rl, PANEL_BG)
         )
-        rl.draw_text(text, (width - tw) // 2, height // 2 - 44, 24, _color(rl, ALERT))
+        _text(rl, text, (width - tw) // 2, height // 2 - 44, 24, _color(rl, ALERT))
     elif game.paused:
         text = "PAUSED  -  RUN to resume" if touch else "PAUSED  -  P to resume"
-        tw = rl.measure_text(text, 24)
-        rl.draw_text(text, (width - tw) // 2, height // 2 - 40, 24, _color(rl, HUD))
+        tw = _measure(rl, text, 24)
+        _text(rl, text, (width - tw) // 2, height // 2 - 40, 24, _color(rl, HUD))
     if mission["status"] != "active":
         again = "NEW for a new hunt" if touch else "R for a new hunt"
         text = (
             f"HUNT OVER ({mission['reason']}): {len(mission['sunk'])} sunk, "
             f"{mission['tonnage']:,} GRT, {len(mission['escaped'])} got away   -   {again}"
         )
-        tw = rl.measure_text(text, 20)
-        rl.draw_text(text, (width - tw) // 2, height // 2 - 10, 20, _color(rl, HUD))
+        tw = _measure(rl, text, 20)
+        _text(rl, text, (width - tw) // 2, height // 2 - 10, 20, _color(rl, HUD))
 
 
 def _wrap(rl, text: str, size: int, max_width: float) -> list[str]:
@@ -408,7 +434,7 @@ def _wrap(rl, text: str, size: int, max_width: float) -> list[str]:
     line = ""
     for word in text.split(" "):
         trial = f"{line} {word}" if line else word
-        if line and rl.measure_text(trial, size) > max_width:
+        if line and _measure(rl, trial, size) > max_width:
             lines.append(line)
             line = word
         else:
@@ -434,6 +460,12 @@ LEGEND = (
     ("dot", DEPTH_CHARGE, "depth charge sinking"),
     ("blur", CUE, "intel / last seen (arrow when off screen)"),
 )
+# Keyboard help, shown under the symbols (touch screens have buttons instead).
+LEGEND_KEYS = (
+    "W/S telegraph   A/D rudder   Q midships",
+    "SPACE dive   C deep   F fire   T next target",
+    "-/= zoom   1-6 time   P pause   L legend",
+)
 LEGEND_WIDTH = 420  # fits the longest row at 14 px
 LEGEND_ROW = 18
 
@@ -441,7 +473,8 @@ LEGEND_ROW = 18
 def _draw_legend(rl, width: int, height: int, pad: Pad | None) -> None:
     """Symbol key in the lower right, above the build tag (L toggles it).  With touch
     buttons up it is centred instead, where no button covers it."""
-    rows = len(LEGEND)
+    keys = LEGEND_KEYS if pad is None else ()
+    rows = len(LEGEND) + len(keys)
     panel_h = LEGEND_ROW * (rows + 1) + 10
     if pad is None:
         x0 = width - LEGEND_WIDTH - 10
@@ -452,11 +485,14 @@ def _draw_legend(rl, width: int, height: int, pad: Pad | None) -> None:
         y0 = max(HUD_TOP, (height - panel_h) // 2)
         title = "LEGEND  (? to hide)"
     rl.draw_rectangle(x0, y0, LEGEND_WIDTH, panel_h, _color(rl, PANEL_BG))
-    rl.draw_text(title, x0 + 8, y0 + 6, 14, _color(rl, HUD))
+    _text(rl, title, x0 + 8, y0 + 6, 14, _color(rl, HUD))
     y = y0 + 6 + LEGEND_ROW
     for kind, rgba, text in LEGEND:
         _draw_swatch(rl, kind, x0 + 20, y + 7, rgba)
-        rl.draw_text(text, x0 + 40, y, 14, _color(rl, HUD_DIM))
+        _text(rl, text, x0 + 40, y, 14, _color(rl, HUD_DIM))
+        y += LEGEND_ROW
+    for text in keys:
+        _text(rl, text, x0 + 8, y, 14, _color(rl, HUD))
         y += LEGEND_ROW
 
 
@@ -525,13 +561,6 @@ def _draw_contact_panel(rl, game: Game, width: int) -> None:
             )
             color = LEAD_BAD if ok and glancing else LEAD_OK if ok else HUD_DIM
             lines.append((text, color))
-        others = [c for c in game.contacts_by_range() if c.ship_id != target.ship_id]
-        for c in others[:4]:
-            how = "sonar" if c.method == HYDROPHONE else "seen"
-            text = f"{c.ship_id}  {c.bearing:03.0f}  {(c.range or 0) / 1000:4.1f} km  {how}"
-            lines.append((text, HYDRO if c.method == HYDROPHONE else HUD_DIM))
-        if others:
-            lines.append(("T: next target", HUD_DIM))
     else:
         lines.append(("no contact", HUD_DIM))
         cue = world.cue()
@@ -543,6 +572,6 @@ def _draw_contact_panel(rl, game: Game, width: int) -> None:
             lines.append((f"  course ~{cue['course']:03.0f}", CUE))
     y = 10
     for text, color in lines:
-        tw = rl.measure_text(text, 18)
-        rl.draw_text(text, width - tw - 10, y, 18, _color(rl, color))
+        tw = _measure(rl, text, 18)
+        _text(rl, text, width - tw - 10, y, 18, _color(rl, color))
         y += 22

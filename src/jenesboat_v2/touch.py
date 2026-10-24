@@ -95,6 +95,8 @@ class TouchState:
     pressed: set[str] = field(default_factory=set)  # taps since the last poll
     pad_left: float = 0.0  # CSS px taken by the clusters on the left...
     pad_right: float = 0.0  # ...and on the right (bottom part of the screen)
+    inset_left: float = 0.0  # CSS px of rounded corner / notch to keep text clear of
+    inset_right: float = 0.0
 
 
 def decode(bits: int) -> set[str]:
@@ -128,6 +130,8 @@ class TouchPad:
             pressed=decode(taps),
             pad_left=self.bridge.get("jb_pad_left") or 0.0,
             pad_right=self.bridge.get("jb_pad_right") or 0.0,
+            inset_left=self.bridge.get("jb_inset_left") or 0.0,
+            inset_right=self.bridge.get("jb_inset_right") or 0.0,
         )
 
     def show(self, confirming: bool, paused: bool, time_scale: int, legend: bool) -> None:
