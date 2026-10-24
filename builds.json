@@ -1,5 +1,19 @@
 [
   {
+    "built_at": "2026-10-24T07:38:57+00:00",
+    "cdn": "https://pygame-web.github.io/archives/0.9/",
+    "kind": "pr",
+    "name": "4135cdb",
+    "pr": 36,
+    "pybuild": "3.12",
+    "ref": "topic/34-escape-balance",
+    "run_url": "https://github.com/pandazxx/jenesboat-v2/actions/runs/40074901658",
+    "sha": "4135cdba7d7b4697dfab2845416b8b1567daa416",
+    "start_url": "builds/4135cdb/start.html",
+    "title": "Escape balance: design note and headless study of a found boat's odds",
+    "url": "builds/4135cdb/"
+  },
+  {
     "built_at": "2026-10-24T06:51:10+00:00",
     "cdn": "https://pygame-web.github.io/archives/0.9/",
     "kind": "commit",
