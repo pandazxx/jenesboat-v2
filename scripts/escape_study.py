@@ -11,6 +11,9 @@ how much damage it takes, how many depth charge runs it suffers and how the enga
     uv run python scripts/escape_study.py --difficulty veteran --seeds 20
     uv run python scripts/escape_study.py --proposal           # the rules proposed in the doc
 
+``--placement inside`` starts the boat on the far side of the convoy from the hunter (found
+while attacking), so the merchants' noise shadows are between them.
+
 ``--proposal`` monkeypatches ``sim.escort`` with the candidate rules of the design note
 (``Proposal`` below) so they can be measured before they are implemented; the implementation
 PRs are expected to move each rule into ``sim/params.py`` and delete the patch here.
@@ -48,15 +51,24 @@ RANGES = (1_000, 2_000, 3_000)
 # --- the engagement ------------------------------------------------------------------------
 
 
+PLACEMENT = "outside"  # or "inside": the convoy lies between the hunter and the boat
+
+
 def setup(seed: int, range_m: float, difficulty: P.Difficulty) -> World:
     """The boat at periscope depth, just pinged by the nearest of the level's destroyers,
-    which is ``range_m`` away and already hunting; the convoy 2 km behind the destroyer."""
+    which is ``range_m`` away and already hunting.  ``PLACEMENT`` puts the convoy 2 km
+    behind the destroyer (``outside``: the boat was found outside the screen) or 600 m
+    from the boat toward the destroyer (``inside``: found while attacking, the merchants
+    between the hunter and the boat)."""
     rules = difficulty.rules
     rng = random.Random(seed)
     sub = new_submarine(x=C, y=C, heading=rng.uniform(0.0, 360.0))
     sub.depth = sub.target_depth = P.TYPE_VIIC.periscope_depth
     brg = rng.uniform(0.0, 360.0)
-    cx, cy = project(C, C, brg, range_m + 2_000.0)
+    if PLACEMENT == "inside":  # the convoy centre 600 m from the boat, toward the hunter
+        cx, cy = project(C, C, brg, 600.0)
+    else:
+        cx, cy = project(C, C, brg, range_m + 2_000.0)
     ships = []
     for i in range(3):
         x, y = project(cx, cy, brg + 90.0, 800.0 * (i - 1))
@@ -166,11 +178,13 @@ def run(
 class Proposal:
     baffle_angle: float = 50.0  # deg either side of the stern the set cannot hear
     depth_blind_ratio: float = 3.0  # echo lost inside depth * ratio (the beam cannot tilt down)
-    sure_fraction: float = 0.4  # a ping inside this fraction of the reach is a sure fix
+    sure_fraction: float = 0.4  # a ping inside this fraction of the reach is a sure fix (kept, Q1)
+    area_base: float = 25.0  # m, radius of the fix's uncertainty area at zero range (Q2)
+    area_per_km: float = 50.0  # m of radius per km of range (175 m at 3 km)
+    noise_base: float = 150.0  # m, noise radius of a stopped or sunk friendly ship (Q3)
+    noise_per_knot: float = 30.0  # m of noise radius per knot of that ship's speed
     own_noise_factor: float = 0.25  # reach while sprinting (sheet: 0.4)
     settle_time: float = 20.0  # s after slowing below own_noise_speed before the set works
-    loud_speed: float = 5.0 * KNOT  # a boat faster than this is heard further
-    loud_factor: float = 1.3
     assumed_depth: float = 40.0  # m, the depth guessed for a sonar-only contact
     depth_step: float = 25.0  # m deeper each run that did no damage
     layer_spread: float = 15.0  # m, the pattern is layered estimate +- this (sheet: 25)
@@ -209,31 +223,56 @@ def _ping(world: World, ship, state) -> None:
     if world.time < state.next_ping:
         return
     state.next_ping = world.time + sonar.ping_interval
-    reach = E.sonar_range(world, ship, sonar)
     sub = world.player
     mem = ship.__dict__
+    # Reach: the sheet's range, the creep bonus, own noise; the old fleet-noise rule is gone
+    # (Q3), the shadows below replace it.
+    reach = sonar.range
+    if abs(sub.speed) <= sonar.quiet_speed:
+        reach *= sonar.quiet_factor
     if abs(ship.speed) > sonar.own_noise_speed:  # sprinting: nearly deaf, and the set must settle
-        reach = reach / sonar.own_noise_factor * PROP.own_noise_factor
+        reach *= PROP.own_noise_factor
         mem["_fast_until"] = world.time + PROP.settle_time
     elif world.time < mem.get("_fast_until", -1.0):
         reach = 0.0
-    if abs(sub.speed) > PROP.loud_speed:
-        reach *= PROP.loud_factor
     state.sonar_range = reach
     d = distance(ship.x, ship.y, sub.x, sub.y)
     blind = max(sonar.min_range, sub.depth * PROP.depth_blind_ratio)
     if d < blind or d > reach:
         return
-    relative = abs(angle_diff(bearing(ship.x, ship.y, sub.x, sub.y), ship.heading))
-    if relative > 180.0 - PROP.baffle_angle:  # in the baffles astern
+    brg = bearing(ship.x, ship.y, sub.x, sub.y)
+    if abs(angle_diff(brg, ship.heading)) > 180.0 - PROP.baffle_angle:  # in the baffles astern
+        return
+    if in_shadow(world, ship, brg, d):
         return
     sure = PROP.sure_fraction * reach
     chance = 1.0 if d <= sure else clamp((reach - d) / (reach - sure), 0.0, 1.0)
     if world.rng.random() > chance:
         return
-    ex = world.rng.uniform(-sonar.position_error, sonar.position_error)
-    ey = world.rng.uniform(-sonar.position_error, sonar.position_error)
-    E.report(world, sub.x + ex, sub.y + ey, "sonar", ship.ship_id)
+    # The fix is a random point in the uncertainty area, which grows with range (Q2).
+    radius = PROP.area_base + PROP.area_per_km * d / 1000.0
+    r = radius * math.sqrt(world.rng.random())
+    fx, fy = project(sub.x, sub.y, world.rng.uniform(0.0, 360.0), r)
+    E.report(world, fx, fy, "sonar", ship.ship_id)
+
+
+def in_shadow(world: World, ship, brg: float, d: float) -> bool:
+    """Is the boat (bearing ``brg``, range ``d`` from the pinging ship) behind the noise of
+    a friendly ship?  Each ship, afloat or not, casts a sector beyond itself whose half-angle
+    is set by its noise radius (base plus speed) at its range."""
+    for other in world.ships:
+        if other is ship:
+            continue
+        od = distance(ship.x, ship.y, other.x, other.y)
+        if od < 1.0 or od >= d:
+            continue
+        noise = PROP.noise_base + PROP.noise_per_knot * (
+            0.0 if other.sunk else abs(other.speed) / KNOT
+        )
+        half = math.degrees(math.atan(noise / od))
+        if abs(angle_diff(bearing(ship.x, ship.y, other.x, other.y), brg)) <= half:
+            return True
+    return False
 
 
 def _drop(world: World, ship, p, depth_params) -> None:
@@ -331,7 +370,8 @@ def uninstall() -> None:
 
 def table(difficulty: P.Difficulty, recipes, ranges, seeds: int, proposal: bool) -> None:
     rules = "PROPOSED" if proposal else "CURRENT"
-    print(f"\n## {difficulty.name}, {rules} rules, {rules_summary(difficulty, proposal)}")
+    summary = rules_summary(difficulty, proposal)
+    print(f"\n## {difficulty.name}, {rules} rules, found {PLACEMENT}, {summary}")
     head = f"{'recipe':24s} {'range':>5s} {'lost':>5s} {'dmg':>5s} {'runs':>5s} {'t_end':>6s}"
     print(f"{head}  how it ended")
     for recipe in recipes:
@@ -354,7 +394,8 @@ def rules_summary(difficulty: P.Difficulty, proposal: bool) -> str:
     prop = PROPOSALS[difficulty.name]
     return (
         f"{base}, leash {prop.hunt_leash / 1000:.0f} km / {prop.max_hunt_time / 60:.0f} min, "
-        f"blind x{prop.depth_blind_ratio:.1f}, baffle {prop.baffle_angle:.0f} deg"
+        f"blind x{prop.depth_blind_ratio:.1f}, baffle {prop.baffle_angle:.0f} deg, "
+        f"area {prop.area_base:.0f} m + {prop.area_per_km:.0f} m/km, shadows"
     )
 
 
@@ -365,7 +406,15 @@ def main() -> None:
     ap.add_argument("--recipes", default=",".join(RECIPES))
     ap.add_argument("--ranges", default=",".join(str(r) for r in RANGES))
     ap.add_argument("--proposal", action="store_true", help="measure the proposed rules")
+    ap.add_argument(
+        "--placement",
+        choices=("outside", "inside"),
+        default="outside",
+        help="found outside the screen (default) or inside the convoy (merchants between)",
+    )
     args = ap.parse_args()
+    global PLACEMENT
+    PLACEMENT = args.placement
     names = list(P.DIFFICULTIES) if args.difficulty == "all" else args.difficulty.split(",")
     recipes = args.recipes.split(",")
     ranges = [int(r) for r in args.ranges.split(",")]

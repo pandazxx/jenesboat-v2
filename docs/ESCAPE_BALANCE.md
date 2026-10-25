@@ -109,21 +109,26 @@ yet: the prototype numbers in section 4 were taken with the first draft.
 The log should still say why an echo was lost (`destroyer-N lost the echo: baffles / under the
 keel / behind merchant-2 / out of reach`), and the HUD ring shows the result.
 
-**Open questions on this section** (asked on #34, 2026-10-25): Q1 is a ping inside the
-reach always an echo, with only its accuracy varying (the reading taken here)? Q2 area
-numbers, and whether a creeping boat gets a bigger area and a sprinting one a smaller. Q3 do
-ships shadow only the sea beyond them, does a stopped or sunk ship cast the base shadow, and
-does the convoy's noise still cost reach on top (proposed: no). Q4 radar range (15 or 20 km),
-levels (`veteran` only or `patrol` too), exact or area fix, does it alert the merchants like a
-sighting. Q5 torpedo line: sweep the whole run or start at a typical firing range (1 to 3 km
-back), does a glancing dud give the line, does a seen G7a wake give it before the hit. Q6 HUD
-ring always or only submerged, and draw the torpedo line too.
+**Decisions (owner, #34, 2026-10-25)**: Q1 the chance of missing a faint echo stays, as a
+parameter (`sure_fraction`). Q2 the area ignores the boat's speed for now. Q3 a stopped or
+sunk ship casts the base shadow; today's fleet-noise reach rule is obsolete. Q4 radar: 20 km
+(to be tuned), exact fix handled like a sighting, `veteran` only. Q5 the torpedo line is given
+as soon as a torpedo is observed (heard, wake seen, or a hit). Q6 location indicators on the
+HUD: one indicator per subject; an exact position when known (sighting, radar) hides every
+estimate; otherwise the best estimate, i.e. the smallest ring. This rule applies to how the
+boat's own contacts are drawn as well as to the escorts' fix on the boat.
 
 **Expected effect on the balance**: with a certain echo inside the reach the escape odds no
 longer come from missed pings; they come from the shadows (a boat that works the convoy's
 noise), the blind zone and the baffles (the hunter's attack cycle), and the leash. The study
-needs a second prototype pass with the area and shadow model before the target table in
-section 2 can be checked; until then section 4 shows the first draft.
+got that second pass on 2026-10-25 (section 4, "second prototype"): the shape at `patrol`
+is the same as with the first draft, a little harsher at 1 km (the area fix and no
+loud-boat penalty) and a little kinder at 3 km. One finding needs a decision (Q7 in section
+6): **the shelter in the fleet is mostly undone by the merchants themselves**. A sonar alarm
+alerts every merchant within 8 km and they run away from the boat, so the ships that were
+between the hunter and the boat clear out within a few minutes and the shadows go with them;
+a boat found inside the convoy (`--placement inside`) then fares *worse* than one found
+outside, because the hunter stays near its convoy and the leash never trips.
 
 ### 3.2 Depth estimate (`Datum.depth`, `EscortAIParams`, `DepthChargeParams`)
 
@@ -177,9 +182,10 @@ anyway for the case where the hunter hovers over a boat that sits still.
 
 ## 4. Prototype results
 
-`scripts/escape_study.py --proposal --difficulty all --seeds 12`. The prototype patches
-`escort._ping`, `escort._drop` and `escort.step` with 3.1 to 3.4 (without the thermal
-layer and the lose-track clock change). "how it ended": `lost` the boat, `gave_up` leash or
+`scripts/escape_study.py --proposal --difficulty all --seeds 12`, first draft of 2026-10-24
+(detection probability, loud boat, +-40 m fix; the second prototype with the reworked
+detection follows below). The prototype patches `escort._ping`, `escort._drop` and
+`escort.step` with 3.1 to 3.4 (without the thermal layer and the lose-track clock change). "how it ended": `lost` the boat, `gave_up` leash or
 time limit, `lost_track` 300 s without a fix, `timeout` still hunted after 30 min.
 
 **patrol** (2 escorts, sonar 3,000 m, leash 10 km / 30 min):
@@ -220,6 +226,40 @@ What the numbers say:
 - `cadet` at 3 km shows the lose-track clock problem (section 3.4): the escort gives up at
   180 s, before it has arrived.
 
+### Second prototype (2026-10-25): uncertainty area and noise shadows
+
+`scripts/escape_study.py --proposal` now carries the reworked detection: the fix is a random
+point in a circle of radius 25 m + 50 m/km of range, friendly ships (afloat or sunk, 150 m +
+30 m/kn) cast noise shadows and the old fleet-noise reach rule is gone, the faint-echo chance
+stays, the loud-boat rule is dropped. `--placement inside` starts the boat 600 m beyond the
+convoy centre as seen from the hunter (found while attacking) so the shadows are in play.
+
+`patrol`, lost fraction, 12 seeds:
+
+| recipe | outside 1 km | outside 3 km | inside 1 km | inside 3 km |
+| --- | --- | --- | --- | --- |
+| stay at periscope depth, stop | 1.00 | 1.00 | 1.00 | 1.00 |
+| go deep, stop | 1.00 | 0.33 | 0.67 | 0.58 |
+| go deep, creep away | 0.75 | 0.17 | 0.92 | 0.50 |
+| go deep, sprint 90 s across, then creep | 0.67 | 0.08 | 0.83 | 0.33 |
+| go deep, flank across | 0.25 | 0.08 | 0.25 | 0.00 |
+| sprint across / creep away, alternating | 0.00 | 0.00 | 0.00 | 0.00 |
+| go deep, flank straight away | 0.25 | 0.00 | 0.42 | 0.25 |
+
+Against the first draft (outside, 1 km / 3 km): deep and still 0.83 / 0.67 -> 1.00 / 0.33;
+creep away 0.58 / 0.17 -> 0.75 / 0.17; sprint then creep 0.50 / 0.17 -> 0.67 / 0.08. The
+target table in section 2 holds at 3 km (creep away 0.17 <= 0.25) and at 1 km the coin toss
+has become 3 in 4, which the area numbers (Q2) can tune. `cadet` is unchanged in character
+(1 to 5 of 12 lost only when sitting or creeping from 1 km); `veteran` is unchanged (0.75 to
+1.00 for the still and creeping recipes, 0.25 to 0.58 for the fast ones). Full tables in the
+appendix.
+
+The inside placement does not show the shelter the shadows were meant to give (see Q7): the
+merchants run from the boat and take their shadows with them, and the hunter, staying close
+to its convoy, is never leashed, so more hunts end as `timeout` (alive after 30 min, still
+hunted) and more as `lost`. The shelter will only work for a boat that is found without the
+merchants being told, or if the merchants' flee rule changes.
+
 ## 5. Suggested phasing
 
 1. **PR 1, detection** (#34, after the Q1 to Q6 answers): `SonarParams` uncertainty area,
@@ -244,9 +284,22 @@ log says why (TC), a 3 km escape at `patrol` (TC, with the study as the automate
 Listed in #34 so the answers land on GitHub: (1) give up vs. stealth as the main way a hunt
 ends; (2) how the escorts form their depth estimate; (3) whether the target table and the
 `veteran` numbers feel right; (4) whether a straight flank run away may stay a battery-costly
-escape or the stern chase must be made deadly. Plus Q1 to Q6 on the detection rework
-(section 3.1). The owner's direction of 2026-10-25 did not mention sections 3.2 to 3.4, which
-stand as proposed until said otherwise.
+escape or the stern chase must be made deadly. Q1 to Q6 on the detection rework are
+answered (section 3.1).
+
+Assumptions taken on 2026-10-25 so that the implementation can start (recorded on #34; the
+owner can overrule any of them there): (1) the leash and the time limit are the hard end of a
+hunt, and losing the track by stealth stays possible but is not tuned to be common at
+`patrol`; (2) the depth estimate walks 25 m deeper after a run and is confirmed only by a run
+that does 10 % or more damage; (3) the target table of section 2 stands, `veteran` is meant
+to be this harsh; (4) the stern chase is made deadly by the run-over release (#35) and the
+battery is the price of sprinting. Sections 3.2 to 3.4 stand as proposed.
+
+**Q7 (new)**: should a sonar alarm still send every merchant within 8 km running from the
+boat? It undoes the shelter in the fleet (section 4, second prototype). Options: merchants
+hold course until an escort has a sighting or a torpedo is observed; or they run only when
+the fix is within some distance of them; or keep today's rule and accept that shelter only
+helps a boat that has not been alarmed on. Not blocking PR 1.
 
 ## Appendix: the study
 
@@ -267,7 +320,10 @@ away from the hunter), `deep_flank_away` (60 m, flank, straight away), `deep_fla
 for 90 s, then AHEAD SLOW 60 deg further round), `knuckle` (60 m, alternate a minute of
 flank across the bearing and a minute of creep away).
 
-Full tables, 12 seeds, lost fraction (dmg = mean hull damage, runs = depth charge runs):
+Full tables, 12 seeds, lost fraction (dmg = mean hull damage, runs = depth charge runs). The
+first three blocks are the current rules; the next three the first-draft prototype of
+2026-10-24 (`PROPOSED rules` without a `found ...` tag); the last six the second prototype of
+2026-10-25 with the uncertainty area and the noise shadows, found outside and inside:
 
 ```
 ## cadet, CURRENT rules, 1 escorts, sonar 2400 m
@@ -413,4 +469,148 @@ deep_sprint_then_creep    3000  0.83  0.97   4.3   1273  lost 10, timeout 2
 knuckle                   1000  0.75  0.87   4.8   1136  lost 9, timeout 3
 knuckle                   2000  0.42  0.58   6.1   1556  lost 5, timeout 7
 knuckle                   3000  0.33  0.59   5.1   1619  lost 4, timeout 8
+
+## cadet, PROPOSED rules, found outside, 1 escorts, sonar 2400 m, leash 6 km / 15 min, blind x4.0, baffle 60 deg, area 25 m + 50 m/km, shadows
+recipe                   range  lost   dmg  runs  t_end  how it ended
+sit                       1000  1.00  1.00   1.0    124  lost 12
+sit                       2000  1.00  1.00   1.0    242  lost 12
+sit                       3000  0.00  0.00   0.0    180  lost_track 12
+deep_sit                  1000  0.17  0.51   2.9    666  gave_up 10, lost 2
+deep_sit                  2000  0.00  0.13   1.7    487  gave_up 12
+deep_sit                  3000  0.00  0.00   0.0    180  lost_track 12
+deep_creep_away           1000  0.17  0.41   2.6    646  gave_up 10, lost 2
+deep_creep_away           2000  0.00  0.04   1.4    509  gave_up 12
+deep_creep_away           3000  0.00  0.01   0.2    219  gave_up 2, lost_track 10
+deep_flank_away           1000  0.00  0.06   1.7    564  gave_up 11, lost_track 1
+deep_flank_away           2000  0.00  0.00   0.0    368  gave_up 12
+deep_flank_away           3000  0.00  0.00   0.0    315  gave_up 9, lost_track 3
+deep_flank_90             1000  0.00  0.08   1.2    399  lost_track 12
+deep_flank_90             2000  0.00  0.05   0.8    463  gave_up 7, lost_track 5
+deep_flank_90             3000  0.00  0.01   0.3    362  gave_up 10, lost_track 2
+deep_sprint_then_creep    1000  0.08  0.35   2.3    645  gave_up 11, lost 1
+deep_sprint_then_creep    2000  0.00  0.09   1.3    489  gave_up 12
+deep_sprint_then_creep    3000  0.00  0.01   0.2    277  gave_up 6, lost_track 6
+knuckle                   1000  0.00  0.02   2.8    749  gave_up 11, lost_track 1
+knuckle                   2000  0.00  0.02   1.3    518  gave_up 12
+knuckle                   3000  0.00  0.02   0.6    386  gave_up 12
+
+## patrol, PROPOSED rules, found outside, 2 escorts, sonar 3000 m, leash 10 km / 30 min, blind x3.0, baffle 50 deg, area 25 m + 50 m/km, shadows
+recipe                   range  lost   dmg  runs  t_end  how it ended
+sit                       1000  1.00  1.00   1.0    124  lost 12
+sit                       2000  1.00  1.00   1.0    242  lost 12
+sit                       3000  1.00  1.00   1.0    375  lost 12
+deep_sit                  1000  1.00  1.00   4.2    873  lost 12
+deep_sit                  2000  0.75  0.88   3.8    939  gave_up 3, lost 9
+deep_sit                  3000  0.33  0.53   3.4    991  gave_up 8, lost 4
+deep_creep_away           1000  0.75  0.86   4.6   1125  gave_up 3, lost 9
+deep_creep_away           2000  0.58  0.75   3.8    973  gave_up 5, lost 7
+deep_creep_away           3000  0.17  0.55   2.8    968  gave_up 10, lost 2
+deep_flank_away           1000  0.25  0.48   3.6   1273  gave_up 9, lost 3
+deep_flank_away           2000  0.00  0.13   1.7    964  gave_up 12
+deep_flank_away           3000  0.00  0.00   0.3    662  gave_up 12
+deep_flank_90             1000  0.25  0.38   1.7    751  gave_up 5, lost 3, lost_track 3, timeout 1
+deep_flank_90             2000  0.08  0.27   1.7    871  gave_up 6, lost 1, lost_track 5
+deep_flank_90             3000  0.08  0.19   1.4    894  gave_up 8, lost 1, lost_track 3
+deep_sprint_then_creep    1000  0.67  0.81   3.8    904  gave_up 4, lost 8
+deep_sprint_then_creep    2000  0.42  0.68   3.4    978  gave_up 7, lost 5
+deep_sprint_then_creep    3000  0.08  0.39   2.8    983  gave_up 11, lost 1
+knuckle                   1000  0.00  0.17   5.3   1449  gave_up 12
+knuckle                   2000  0.08  0.28   4.1   1157  gave_up 11, lost 1
+knuckle                   3000  0.00  0.16   2.8   1006  gave_up 12
+
+## veteran, PROPOSED rules, found outside, 3 escorts, sonar 3600 m, leash 15 km / 60 min, blind x2.5, baffle 40 deg, area 25 m + 50 m/km, shadows
+recipe                   range  lost   dmg  runs  t_end  how it ended
+sit                       1000  1.00  1.00   1.0    124  lost 12
+sit                       2000  1.00  1.00   1.0    242  lost 12
+sit                       3000  1.00  1.00   1.0    360  lost 12
+deep_sit                  1000  1.00  1.00   4.3    893  lost 12
+deep_sit                  2000  0.92  0.99   4.5   1065  lost 11, timeout 1
+deep_sit                  3000  0.83  0.98   4.3   1139  lost 10, timeout 2
+deep_creep_away           1000  0.83  0.98   5.2   1209  lost 10, timeout 2
+deep_creep_away           2000  0.83  0.94   4.1   1126  lost 10, timeout 2
+deep_creep_away           3000  0.75  0.93   4.3   1284  lost 9, timeout 3
+deep_flank_away           1000  0.83  0.99   4.7   1355  lost 10, timeout 2
+deep_flank_away           2000  0.67  0.85   3.8   1382  lost 8, timeout 4
+deep_flank_away           3000  0.33  0.65   3.5   1686  gave_up 1, lost 4, timeout 7
+deep_flank_90             1000  0.42  0.76   3.5   1527  gave_up 1, lost 5, timeout 6
+deep_flank_90             2000  0.25  0.59   3.2   1582  gave_up 2, lost 3, timeout 7
+deep_flank_90             3000  0.25  0.56   2.8   1468  gave_up 4, lost 3, timeout 5
+deep_sprint_then_creep    1000  1.00  1.00   4.3    999  lost 12
+deep_sprint_then_creep    2000  0.75  0.88   4.6   1230  lost 9, timeout 3
+deep_sprint_then_creep    3000  0.58  0.88   5.2   1494  lost 7, timeout 5
+knuckle                   1000  0.33  0.64   5.8   1546  lost 4, timeout 8
+knuckle                   2000  0.42  0.47   5.6   1509  lost 5, timeout 7
+knuckle                   3000  0.42  0.71   4.7   1518  lost 5, timeout 7
+
+## cadet, PROPOSED rules, found inside, 1 escorts, sonar 2400 m, leash 6 km / 15 min, blind x4.0, baffle 60 deg, area 25 m + 50 m/km, shadows
+recipe                   range  lost   dmg  runs  t_end  how it ended
+sit                       1000  1.00  1.00   1.0    124  lost 12
+sit                       2000  1.00  1.00   1.0    242  lost 12
+sit                       3000  1.00  1.00   1.0    339  lost 12
+deep_sit                  1000  0.42  0.54   3.8    834  gave_up 7, lost 5
+deep_sit                  2000  0.17  0.44   3.0    872  gave_up 10, lost 2
+deep_sit                  3000  0.00  0.00   0.0    180  lost_track 12
+deep_creep_away           1000  0.33  0.56   2.8    714  gave_up 6, lost 4, lost_track 2
+deep_creep_away           2000  0.08  0.46   3.0    872  gave_up 10, lost 1, lost_track 1
+deep_creep_away           3000  0.00  0.00   0.0    180  lost_track 12
+deep_flank_away           1000  0.00  0.14   2.3    839  gave_up 11, lost_track 1
+deep_flank_away           2000  0.00  0.02   1.1    729  gave_up 8, lost_track 4
+deep_flank_away           3000  0.00  0.00   0.1    235  gave_up 1, lost_track 11
+deep_flank_90             1000  0.00  0.04   1.2    397  lost_track 12
+deep_flank_90             2000  0.00  0.06   1.0    519  lost_track 12
+deep_flank_90             3000  0.00  0.02   0.2    297  lost_track 12
+deep_sprint_then_creep    1000  0.33  0.63   2.9    769  gave_up 7, lost 4, lost_track 1
+deep_sprint_then_creep    2000  0.00  0.34   2.9    859  gave_up 11, lost_track 1
+deep_sprint_then_creep    3000  0.00  0.00   0.0    180  lost_track 12
+knuckle                   1000  0.00  0.02   3.0    823  gave_up 10, lost_track 2
+knuckle                   2000  0.00  0.01   2.1    704  gave_up 7, lost_track 5
+knuckle                   3000  0.00  0.00   0.0    180  lost_track 12
+
+## patrol, PROPOSED rules, found inside, 2 escorts, sonar 3000 m, leash 10 km / 30 min, blind x3.0, baffle 50 deg, area 25 m + 50 m/km, shadows
+recipe                   range  lost   dmg  runs  t_end  how it ended
+sit                       1000  1.00  1.00   1.0    124  lost 12
+sit                       2000  1.00  1.00   1.0    242  lost 12
+sit                       3000  1.00  1.00   1.0    339  lost 12
+deep_sit                  1000  0.67  0.91   5.1   1136  lost 8, timeout 4
+deep_sit                  2000  0.83  0.89   4.7   1103  lost 10, timeout 2
+deep_sit                  3000  0.58  0.63   3.5   1028  lost 7, lost_track 4, timeout 1
+deep_creep_away           1000  0.92  0.95   4.3   1042  lost 11, timeout 1
+deep_creep_away           2000  0.92  0.95   4.9   1285  lost 11, timeout 1
+deep_creep_away           3000  0.50  0.66   3.4   1138  gave_up 1, lost 6, lost_track 3, timeout 2
+deep_flank_away           1000  0.42  0.58   4.2   1448  gave_up 4, lost 5, timeout 3
+deep_flank_away           2000  0.33  0.56   3.4   1465  gave_up 5, lost 4, timeout 3
+deep_flank_away           3000  0.25  0.37   1.8   1108  gave_up 6, lost 3, lost_track 3
+deep_flank_90             1000  0.25  0.40   2.7   1068  gave_up 6, lost 3, lost_track 3
+deep_flank_90             2000  0.08  0.25   2.0   1147  gave_up 4, lost 1, lost_track 6, timeout 1
+deep_flank_90             3000  0.00  0.06   1.2    984  gave_up 5, lost_track 6, timeout 1
+deep_sprint_then_creep    1000  0.83  0.94   4.8   1173  lost 10, timeout 2
+deep_sprint_then_creep    2000  0.83  0.88   4.8   1309  lost 10, timeout 2
+deep_sprint_then_creep    3000  0.33  0.49   2.8    999  gave_up 1, lost 4, lost_track 5, timeout 2
+knuckle                   1000  0.00  0.17   6.8   1796  gave_up 1, timeout 11
+knuckle                   2000  0.17  0.39   5.8   1618  gave_up 1, lost 2, timeout 9
+knuckle                   3000  0.00  0.14   4.8   1505  gave_up 4, lost_track 2, timeout 6
+
+## veteran, PROPOSED rules, found inside, 3 escorts, sonar 3600 m, leash 15 km / 60 min, blind x2.5, baffle 40 deg, area 25 m + 50 m/km, shadows
+recipe                   range  lost   dmg  runs  t_end  how it ended
+sit                       1000  1.00  1.00   1.0    124  lost 12
+sit                       2000  1.00  1.00   1.0    242  lost 12
+sit                       3000  1.00  1.00   1.0    339  lost 12
+deep_sit                  1000  0.75  0.96   5.3   1168  lost 9, timeout 3
+deep_sit                  2000  0.92  1.00   4.8   1136  lost 11, timeout 1
+deep_sit                  3000  0.92  0.98   4.4   1185  lost 11, timeout 1
+deep_creep_away           1000  0.75  0.95   5.2   1260  lost 9, timeout 3
+deep_creep_away           2000  0.75  0.98   4.2   1160  lost 9, timeout 3
+deep_creep_away           3000  0.83  0.95   4.7   1409  lost 10, timeout 2
+deep_flank_away           1000  0.58  0.79   5.2   1654  lost 7, timeout 5
+deep_flank_away           2000  0.58  0.81   4.3   1593  lost 7, timeout 5
+deep_flank_away           3000  0.50  0.71   3.5   1588  lost 6, timeout 6
+deep_flank_90             1000  0.42  0.71   3.8   1501  lost 5, timeout 7
+deep_flank_90             2000  0.42  0.73   3.5   1639  lost 5, timeout 7
+deep_flank_90             3000  0.25  0.64   2.8   1639  lost 3, timeout 9
+deep_sprint_then_creep    1000  0.92  0.98   4.2   1000  lost 11, timeout 1
+deep_sprint_then_creep    2000  0.67  0.91   5.0   1352  lost 8, timeout 4
+deep_sprint_then_creep    3000  0.83  0.94   4.0   1249  lost 10, timeout 2
+knuckle                   1000  0.42  0.62   5.2   1406  lost 5, timeout 7
+knuckle                   2000  0.25  0.48   5.8   1630  lost 3, timeout 9
+knuckle                   3000  0.50  0.65   4.8   1452  lost 6, timeout 6
 ```
