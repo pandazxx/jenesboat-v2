@@ -14,6 +14,9 @@ how much damage it takes, how many depth charge runs it suffers and how the enga
 ``--placement inside`` starts the boat on the far side of the convoy from the hunter (found
 while attacking), so the merchants' noise shadows are between them.
 
+``--story deep_creep_away --ranges 3000,1000`` prints one escape (first found at 3 km, else
+1 km) and one loss (1 km, else 3 km) of that recipe as the Markdown tables used on #34.
+
 ``--proposal`` monkeypatches ``sim.escort`` with the candidate rules of the design note
 (``Proposal`` below) so they can be measured before they are implemented; the implementation
 PRs are expected to move each rule into ``sim/params.py`` and delete the patch here.
@@ -230,36 +233,51 @@ def _ping(world: World, ship, state) -> None:
     reach = sonar.range
     if abs(sub.speed) <= sonar.quiet_speed:
         reach *= sonar.quiet_factor
+    sprinting = settling = False
     if abs(ship.speed) > sonar.own_noise_speed:  # sprinting: nearly deaf, and the set must settle
         reach *= PROP.own_noise_factor
         mem["_fast_until"] = world.time + PROP.settle_time
+        sprinting = True
     elif world.time < mem.get("_fast_until", -1.0):
         reach = 0.0
+        settling = True
     state.sonar_range = reach
     d = distance(ship.x, ship.y, sub.x, sub.y)
     blind = max(sonar.min_range, sub.depth * PROP.depth_blind_ratio)
-    if d < blind or d > reach:
-        return
     brg = bearing(ship.x, ship.y, sub.x, sub.y)
-    if abs(angle_diff(brg, ship.heading)) > 180.0 - PROP.baffle_angle:  # in the baffles astern
-        return
-    if in_shadow(world, ship, brg, d):
-        return
+    shadow = in_shadow(world, ship, brg, d)
     sure = PROP.sure_fraction * reach
-    chance = 1.0 if d <= sure else clamp((reach - d) / (reach - sure), 0.0, 1.0)
-    if world.rng.random() > chance:
+    chance = 1.0 if d <= sure else clamp((reach - d) / max(reach - sure, 1e-9), 0.0, 1.0)
+    if settling:
+        why = "set settling after the sprint"
+    elif d < blind:
+        why = f"boat under the keel (blind zone {blind:.0f} m)"
+    elif d > reach:
+        why = f"out of reach ({reach:.0f} m{', sprinting' if sprinting else ''})"
+    elif abs(angle_diff(brg, ship.heading)) > 180.0 - PROP.baffle_angle:
+        why = "boat in the baffles astern"
+    elif shadow is not None:
+        why = f"boat behind {shadow}'s noise"
+    elif world.rng.random() > chance:
+        why = f"faint echo missed ({chance:.0%} chance at {d:.0f} of {reach:.0f} m)"
+    else:
+        why = None
+    if why is not None:
+        mem["_ping_why"] = "no echo: " + why
         return
     # The fix is a random point in the uncertainty area, which grows with range (Q2).
     radius = PROP.area_base + PROP.area_per_km * d / 1000.0
     r = radius * math.sqrt(world.rng.random())
     fx, fy = project(sub.x, sub.y, world.rng.uniform(0.0, 360.0), r)
+    mem["_ping_why"] = "echo"
+    mem["_fix_radius"] = radius
     E.report(world, fx, fy, "sonar", ship.ship_id)
 
 
-def in_shadow(world: World, ship, brg: float, d: float) -> bool:
-    """Is the boat (bearing ``brg``, range ``d`` from the pinging ship) behind the noise of
-    a friendly ship?  Each ship, afloat or not, casts a sector beyond itself whose half-angle
-    is set by its noise radius (base plus speed) at its range."""
+def in_shadow(world: World, ship, brg: float, d: float) -> str | None:
+    """The id of the friendly ship whose noise hides the boat (bearing ``brg``, range ``d``
+    from the pinging ship), or ``None``.  Each ship, afloat or not, casts a sector beyond
+    itself whose half-angle is set by its noise radius (base plus speed) at its range."""
     for other in world.ships:
         if other is ship:
             continue
@@ -271,8 +289,8 @@ def in_shadow(world: World, ship, brg: float, d: float) -> bool:
         )
         half = math.degrees(math.atan(noise / od))
         if abs(angle_diff(bearing(ship.x, ship.y, other.x, other.y), brg)) <= half:
-            return True
-    return False
+            return other.ship_id
+    return None
 
 
 def _drop(world: World, ship, p, depth_params) -> None:
@@ -399,6 +417,239 @@ def rules_summary(difficulty: P.Difficulty, proposal: bool) -> str:
     )
 
 
+# --- stories: one engagement as a table (the format agreed on #34) ---------------------------
+
+STORY_HEAD = (
+    "| time | boat | hunter | range / bearing | boat does | hunter does | hunter's sonar "
+    "| hunter's track on the boat |\n|---|---|---|---|---|---|---|---|\n"
+)
+TITLES = {
+    "sit": "Stay at periscope depth, stop",
+    "deep_sit": "Go deep (60 m), stop",
+    "deep_creep_away": "Go deep, creep (AHEAD SLOW) straight away from the hunter",
+    "deep_flank_away": "Go deep, AHEAD FLANK straight away from the hunter",
+    "deep_flank_90": "Go deep, AHEAD FLANK 90 deg off the original heading",
+    "deep_sprint_then_creep": "Go deep, 90 s AHEAD FLANK across, then AHEAD SLOW 150 deg off",
+    "knuckle": "Go deep, alternate 60 s AHEAD FLANK across the bearing / 60 s AHEAD SLOW away",
+}
+
+
+def mmss(t: float) -> str:
+    return f"{int(t // 60)}:{int(t % 60):02d}"
+
+
+def _hunter_state(h, world: World) -> str:
+    kn = h.speed / KNOT
+    if h.escort.drop_left > 0:
+        what = "dropping"
+    elif kn > 15.5:
+        what = "sprint"
+    elif h.escort.mode != HUNT:
+        what = h.escort.mode
+    elif world.datum is not None and world.time - world.datum.t <= E.FRESH_DATUM:
+        what = "closing"
+    else:
+        what = "searching"
+    return f"{what} {kn:.0f} kn"
+
+
+def _track(world: World, h) -> str:
+    if world.datum is None:
+        return "-"
+    parts = [f"fix {world.time - world.datum.t:.0f} s old"]
+    if world.datum.reason == "sonar" and "_fix_radius" in h.__dict__:
+        parts.append(f"ring {h.__dict__['_fix_radius']:.0f} m")
+    est = world.__dict__.get("_depth_est")
+    if est is not None:
+        parts.append(f"depth guess {est:.0f} m")
+    return ", ".join(parts)
+
+
+def story(recipe: str, range_m: float, seed: int, difficulty: P.Difficulty) -> tuple[list, dict]:
+    """Play one engagement under the installed rules and return the table rows and the
+    outcome.  A row for every change on either side, and one a minute otherwise."""
+    world = setup(seed, range_m, difficulty)
+    sub, h = world.player, world.ships[3]
+    h.__dict__["_ping_why"] = "no ping yet"
+    start_heading = sub.heading
+    rows: list[tuple] = []
+    runs = 0
+    run: dict | None = None
+    prev_contact = None
+    hist: list[str] = []
+    last_ping = None
+    next_sample = 60.0
+    first = True
+    pb = (sub.throttle, sub.target_depth)
+
+    def flush(t: float, boat_txt: list[str], hunter_txt: list[str]) -> None:
+        d = distance(h.x, h.y, sub.x, sub.y)
+        rel = abs(angle_diff(bearing(h.x, h.y, sub.x, sub.y), h.heading))
+        rows.append(
+            (
+                mmss(t),
+                f"{sub.depth:.0f} m, {sub.telegraph_label} {abs(sub.speed) / KNOT:.1f} kn",
+                _hunter_state(h, world),
+                f"{d:.0f} m / {rel:.0f} deg off the bow",
+                "; ".join(boat_txt) or "-",
+                "; ".join(hunter_txt) or "-",
+                h.__dict__["_ping_why"],
+                _track(world, h),
+            )
+        )
+
+    while world.time < 1_800.0:
+        orders(recipe, world, world.time, start_heading)
+        t = world.time
+        boat_txt: list[str] = []
+        hunter_txt: list[str] = []
+        if first:
+            boat_txt.append("found at periscope depth by the hunter's sonar")
+            hunter_txt.append("has the first fix, turns toward it to hunt")
+            first = False
+        if (sub.throttle, sub.target_depth) != pb:
+            if sub.target_depth != pb[1]:
+                boat_txt.append(f"orders {sub.target_depth:.0f} m")
+            if sub.throttle != pb[0]:
+                boat_txt.append(f"rings {sub.telegraph_label}")
+            pb = (sub.throttle, sub.target_depth)
+        depth_before = sub.depth
+        state_before = _hunter_state(h, world).split()[0]
+        drop_before = h.escort.drop_left
+        world.step(0.5)
+        if depth_before != sub.target_depth and sub.depth == sub.target_depth:
+            boat_txt.append(f"reaches {sub.depth:.0f} m")
+        state_after = _hunter_state(h, world).split()[0]
+        if state_after != state_before and "dropping" not in (state_before, state_after):
+            if state_after == "sprint":
+                hunter_txt.append("sprints at 20 kn for the predicted position (set deafened)")
+            elif state_after == "closing" and state_before == "searching":
+                hunter_txt.append("fix fresh again: steers for the predicted position at 14 kn")
+            elif state_after == "closing":
+                hunter_txt.append("slows to 14 kn so the set can hear, closes on the prediction")
+            elif state_after == "searching":
+                hunter_txt.append("no fix for 60 s: box search at 12 kn around the last fix")
+            elif state_after == "formation":
+                hunter_txt.append("returns to formation")
+        for e in world.events:
+            if e["event"] == "damage":
+                world.__dict__["_dmg_since_run"] = True
+            elif e["event"] == "depth_charge_run":
+                runs += 1
+                run = {
+                    "charges0": e["charges"],  # the magazine before the run's first drop
+                    "dropped": None,
+                    "bursts": [],
+                    "dmg0": sub.damage,
+                }
+                hunter_txt.append(
+                    f"starts run {runs}: predicted position within 150 m, holds course"
+                )
+            elif e["event"] == "depth_charge" and run is not None:
+                run["bursts"].append((e["depth"], math.hypot(e["x"] - sub.x, e["y"] - sub.y)))
+            elif e["event"] == "escort_stand_down":
+                why = (
+                    "leash: hunter 10 km from the convoy"
+                    if world.__dict__.get("_gave_up")
+                    else "track lost 300 s"
+                )
+                hunter_txt.append(f"escorts stand down ({why})")
+        world.events.clear()
+        if run is not None and run["bursts"]:  # a burst's damage lands after its event
+            done = run["dropped"] is not None and len(run["bursts"]) >= run["dropped"]
+            if sub.destroyed or done:
+                depths = sorted(b[0] for b in run["bursts"])
+                near = min(b[1] for b in run["bursts"])
+                hunter_txt.append(
+                    f"pattern of run {runs} bursts: {len(run['bursts'])} charges set "
+                    f"{depths[0]:.0f}-{depths[-1]:.0f} m (boat at {sub.depth:.0f} m), nearest "
+                    f"{near:.0f} m off the hull; hull {run['dmg0']:.0%} -> {sub.damage:.0%}"
+                )
+                if sub.destroyed:
+                    boat_txt.append("boat lost")
+                run = None
+        if run is not None and run["dropped"] is None and h.escort.drop_left == 0 and drop_before:
+            run["dropped"] = run["charges0"] - h.escort.charges
+            if run["dropped"] == 0:
+                hunter_txt.append(
+                    f"run {runs} abandoned: aim points out of reach for 40 s, nothing dropped"
+                )
+                run = None
+            else:
+                rest = "" if run["dropped"] == 6 else " (the rest aimed beyond 150 m)"
+                hunter_txt.append(
+                    f"run {runs}: {run['dropped']} of 6 charges dropped{rest}, rack reloading 120 s"
+                )
+        ping = (h.__dict__["_ping_why"], h.escort.next_ping)
+        if ping != last_ping:  # a new ping result
+            last_ping = ping
+            contact = "echo" if ping[0] == "echo" else ping[0].split(":")[1].split("(")[0].strip()
+            hist.append(contact)
+            del hist[:-2]
+            if contact == "echo" and prev_contact != "echo":
+                if prev_contact is not None:
+                    hunter_txt.append("regains the echo")
+                prev_contact = "echo"
+            elif contact != "echo" and prev_contact == "echo" and hist[0] != "echo":
+                hunter_txt.append(f"loses the echo: {hist[0]}")  # two misses in a row
+                prev_contact = hist[0]
+            elif prev_contact is None:
+                prev_contact = contact
+        if boat_txt or hunter_txt:
+            flush(t, boat_txt, hunter_txt)
+            next_sample = t + 60.0
+        elif t >= next_sample:
+            flush(t, [], [])
+            next_sample = t + 60.0
+        if sub.destroyed or (rows and "stand down" in rows[-1][5]):
+            break
+    end = (
+        "boat lost"
+        if sub.destroyed
+        else ("escorts gave up" if world.__dict__.get("_gave_up") else "track lost")
+    )
+    info = {
+        "end": end,
+        "t": world.time,
+        "dmg": sub.damage,
+        "runs": runs,
+        "charges": world.rules.depth_charge.magazine - max(h.escort.charges, 0),
+        "battery": sub.battery,
+    }
+    return rows, info
+
+
+def find_seed(recipe: str, ranges, outcome: str, seeds: int, difficulty: P.Difficulty):
+    """The first (range, seed) whose engagement ends as ``outcome`` ('escaped' or 'lost')."""
+    for range_m in ranges:
+        for seed in range(seeds):
+            r = run(seed, range_m, recipe, difficulty)
+            if (r["end"] == "lost") == (outcome == "lost"):
+                return range_m, seed
+    return None
+
+
+def render_story(recipe: str, ranges, seeds: int, difficulty: P.Difficulty) -> str:
+    out = [f"## {TITLES.get(recipe, recipe)} (`{recipe}`), found {PLACEMENT}\n"]
+    for outcome, order in (("escaped", ranges), ("lost", list(reversed(ranges)))):
+        pick = find_seed(recipe, order, outcome, seeds, difficulty)
+        if pick is None:
+            out.append(
+                f"### {outcome.capitalize()}: no case\n\nNever happened in {seeds} seeds at "
+                f"{', '.join(str(r) for r in ranges)} m.\n"
+            )
+            continue
+        rows, info = story(recipe, pick[0], pick[1], difficulty)
+        out.append(f"### {outcome.capitalize()}: found at {pick[0] / 1000:g} km, seed {pick[1]}\n")
+        out.append(
+            f"**Outcome:** {info['end']} at {mmss(info['t'])}; hull damage {info['dmg']:.0%}; "
+            f"{info['runs']} runs, {info['charges']} charges dropped; "
+            f"battery {info['battery']:.0%}.\n"
+        )
+        out.append(STORY_HEAD + "".join("| " + " | ".join(r) + " |\n" for r in rows))
+    return "\n".join(out)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--difficulty", default="patrol", help="comma-separated levels, or 'all'")
@@ -406,6 +657,12 @@ def main() -> None:
     ap.add_argument("--recipes", default=",".join(RECIPES))
     ap.add_argument("--ranges", default=",".join(str(r) for r in RANGES))
     ap.add_argument("--proposal", action="store_true", help="measure the proposed rules")
+    ap.add_argument(
+        "--story",
+        default=None,
+        metavar="RECIPE",
+        help="print one escape and one loss of RECIPE as Markdown tables (first level only)",
+    )
     ap.add_argument(
         "--placement",
         choices=("outside", "inside"),
@@ -422,6 +679,9 @@ def main() -> None:
         if args.proposal:
             install(name)
         try:
+            if args.story:
+                print(render_story(args.story, ranges, args.seeds, P.DIFFICULTIES[name]))
+                break
             table(P.DIFFICULTIES[name], recipes, ranges, args.seeds, args.proposal)
         finally:
             uninstall()
