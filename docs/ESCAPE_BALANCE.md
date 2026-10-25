@@ -1,6 +1,7 @@
 # Escape balance: a found boat should be able to get away
 
-Status: brainstorm and proposal, 2026-10-24. Requirement issue #34 (decisions go there), bug
+Status: brainstorm and proposal, 2026-10-24; detection section reworked to the owner's
+direction on 2026-10-25 (section 3.1). Requirement issue #34 (decisions go there), bug
 #35 (the stern chase stalemate found on the way). Nothing in this page is implemented yet;
 the numbers come from `scripts/escape_study.py`, a headless harness that plays a found boat
 against the escorts with fixed evasion recipes, under the current rules and under a
@@ -75,19 +76,54 @@ per difficulty. The player's suggestions were sonar blind spots, sonar at speed,
 and depth-dependent damage; the list below includes them and what the study found necessary
 besides.
 
-### 3.1 Sonar limits (`SonarParams`)
+### 3.1 Detection (reworked to the owner's direction, 2026-10-25)
 
-| rule | what | why | dial |
+The owner's comment on #34 (2026-10-25) replaces the first draft of this section. The sonar
+rules of the prototype that survive are marked *kept*; two are *dropped* unless the open
+questions below bring them back; the rest is new. Nothing here is implemented or measured
+yet: the prototype numbers in section 4 were taken with the first draft.
+
+**Active sonar (`SonarParams`)**
+
+| rule | what | why | status / dial |
 | --- | --- | --- | --- |
-| **stern baffles** `baffle_angle` | no echo from a boat within this angle of the destroyer's stern | the ASDIC dome is forward; the hull and the wake block the stern arc. A hunter that overruns the boat loses it until it turns | cadet 60, patrol 50, veteran 40 deg |
-| **depth blind zone** `depth_blind_ratio` | the echo is lost inside `max(min_range, depth x ratio)` | the beam cannot be tilted down; a deep boat is lost further out, so the last run-in is blind for longer and the pattern is aimed on dead reckoning. The historical reason deep diving worked, and why Hedgehog was built | cadet 4, patrol 3, veteran 2.5 (a 60 m boat is lost inside 240 / 180 / 150 m; a 150 m boat inside 600 / 450 / 375 m) |
-| **detection probability** `sure_fraction` | a ping inside this fraction of the reach is a sure fix; beyond it the chance falls linearly to 0 at the edge of the reach | an echo at the edge of the range is a faint one the operator misses more often than not. Also makes the course estimate (three fixes in 45 s) harder to get on a distant boat | cadet 0.4, patrol 0.4, veteran 0.5 |
-| **sprint deafness** `own_noise_factor` 0.4 -> 0.25, new `settle_time` | nearly deaf above `own_noise_speed`, and the set needs this long after slowing before it hears | the player's "sonar availability at high speed"; the settle time is what gives a boat that turned during the charge its chance | settle 20 s |
-| **loud boat** `loud_speed`, `loud_factor` | a boat faster than this is heard x1.3 further | the mirror of the creep bonus (`quiet_factor`); sprinting must cost something besides battery | 5 kn, 1.3 |
-| *(optional)* **thermal layer** `layer_depth`, `layer_factor` | a layer depth per hunt (say 40 to 90 m, from the seed); below it the reach is halved | gives "go deep" a reason beyond invisibility to lookouts, and a reason to look at the depth gauge; a classic of the genre | cadet always has one, veteran rarely |
+| **uncertainty area** `area_base`, `area_per_km` | a ping inside the reach returns a fix that is a random point inside a circle around the boat whose radius grows with range: `area_base + area_per_km x range` (sketch 25 m + 50 m/km: 75 m at 1 km, 175 m at 3 km). The AI works from that point as it does today from the +-40 m fix | an echo at long range gives a bearing and a rough range; the course estimate from the 45 s window only becomes usable close in | new; numbers open (Q2) |
+| **HUD fix ring** | the player sees the escorts' fix on the boat: a ring of the area's diameter centred on the random point, fading with the fix's age, gone when the echo is lost | the player can read *that* they are held and *how well*; today the only trace of a ping is a log line | new (`render.py`, from `world.datum`); Q6 |
+| **noise shadows** `noise_base`, `noise_per_knot` | every friendly ship casts a sector of noise behind it as seen from the pinging destroyer, half-angle `atan(noise_radius / range to that ship)`, `noise_radius = noise_base + noise_per_knot x speed`, never zero (sketch 150 m + 30 m/kn: a freighter at 8 kn shadows 390 m, at 11 kn 480 m). A boat inside a sector and beyond the ship gives no echo | the convoy's own screws mask the sea behind it: the boat can shelter in the fleet, and a running convoy shelters it more. Replaces the "-12 % reach per ship within 2.5 km" rule (`interference_*`) | new; replaces `interference_radius / per_ship / floor`; Q3 |
+| **stern baffles** `baffle_angle` | no echo within this angle of the destroyer's stern | the dome is forward; the hull and wake block the stern arc | *kept*: cadet 60, patrol 50, veteran 40 deg |
+| **depth blind zone** `depth_blind_ratio` | echo lost inside `max(min_range, depth x ratio)` | the beam cannot tilt down; a deep boat is lost further out and the last run-in is blind | *kept*: cadet 4, patrol 3, veteran 2.5 |
+| **sprint deafness** `own_noise_factor`, `settle_time` | nearly deaf above `own_noise_speed`, 20 s to settle after slowing | the player's "sonar at high speed" | *kept* (settle time to confirm) |
+| detection probability `sure_fraction` | a chance of missing a faint echo near the edge of the reach | | *dropped* unless Q1 keeps it: the area model carries the range penalty instead |
+| loud boat `loud_speed`, `loud_factor` | a sprinting boat heard x1.3 further | | *dropped*; could return as a smaller area for a loud boat (Q2) |
+| *(optional)* thermal layer | reach halved below a layer depth | | parked |
 
-The HUD already shows each destroyer's current reach (`sonar_m`); the log should add
-`destroyer-N lost the echo (baffles / under the keel / out of reach)`.
+**Other sensors**
+
+| sensor | rule | code |
+| --- | --- | --- |
+| **visual** (lookouts) | unchanged: the detection table in `docs/PARAMETERS.md`; a sighting gives an exact fix | `sim/detection.py`, as today |
+| **radar** | new, optional by difficulty (`RadarParams`: range, levels). Long range, detects *surfaced vessels only*: a surfaced boat, never a periscope or a submerged boat. Gives a continuous exact track while the boat is up. With no night yet (`light` = 1) its first effect is that a surfaced approach against a radar level is spotted long before the 9 km lookouts | new block in `sim/params.py`, a check in `world._lookouts` or beside it; Q4 |
+| **hydrophone** | boat only, unchanged (bearing-only contacts, needs depth >= 11 m and <= 4 kn). The escorts' 1,200 m torpedo hearing for the `comb` evasion stays as it is | `sim/detection.py`, `sim/escort.py` |
+| **torpedo trace** | a torpedo hit (or a seen wake) gives the escorts the torpedo's *track line* and the knowledge that the boat is somewhere on it within the torpedo's run (5,000 m for a G7e), not a point 2 km back (`THREAT_BEHIND_TORPEDO`). The datum becomes a line: hunters sweep down the track from the target outward, pinging; the convoy turns away from the line; the HUD can draw it | `Datum` gains a line kind (`sim/escort.py`), `world._torpedo_alarm`; Q5 |
+
+The log should still say why an echo was lost (`destroyer-N lost the echo: baffles / under the
+keel / behind merchant-2 / out of reach`), and the HUD ring shows the result.
+
+**Open questions on this section** (asked on #34, 2026-10-25): Q1 is a ping inside the
+reach always an echo, with only its accuracy varying (the reading taken here)? Q2 area
+numbers, and whether a creeping boat gets a bigger area and a sprinting one a smaller. Q3 do
+ships shadow only the sea beyond them, does a stopped or sunk ship cast the base shadow, and
+does the convoy's noise still cost reach on top (proposed: no). Q4 radar range (15 or 20 km),
+levels (`veteran` only or `patrol` too), exact or area fix, does it alert the merchants like a
+sighting. Q5 torpedo line: sweep the whole run or start at a typical firing range (1 to 3 km
+back), does a glancing dud give the line, does a seen G7a wake give it before the hit. Q6 HUD
+ring always or only submerged, and draw the torpedo line too.
+
+**Expected effect on the balance**: with a certain echo inside the reach the escape odds no
+longer come from missed pings; they come from the shadows (a boat that works the convoy's
+noise), the blind zone and the baffles (the hunter's attack cycle), and the leash. The study
+needs a second prototype pass with the area and shadow model before the target table in
+section 2 can be checked; until then section 4 shows the first draft.
 
 ### 3.2 Depth estimate (`Datum.depth`, `EscortAIParams`, `DepthChargeParams`)
 
@@ -186,9 +222,11 @@ What the numbers say:
 
 ## 5. Suggested phasing
 
-1. **PR 1, sonar and depth estimate** (#34): `SonarParams` baffles, blind zone, probability,
-   settle time, loud boat; `Datum.depth` and the estimate walk; narrower layers; the
-   lose-track clock; `escort_stand_down` reasons; log lines. Unit tests per rule
+1. **PR 1, detection** (#34, after the Q1 to Q6 answers): `SonarParams` uncertainty area,
+   noise shadows, baffles, blind zone, settle time; the HUD fix ring; the torpedo track line
+   datum; `escort_stand_down` reasons; log lines. **PR 1b, radar** (`RadarParams` per level).
+   Then the depth estimate: `Datum.depth` and the estimate walk; narrower layers; the
+   lose-track clock. Unit tests per rule
    (`tests/test_escort.py`), level ordering in `tests/test_difficulty.py`, the study script
    loses its `--proposal` patch and becomes the balance check it already is (kept out of the
    default pytest run for time: one table is 30 to 40 s).
@@ -206,7 +244,9 @@ log says why (TC), a 3 km escape at `patrol` (TC, with the study as the automate
 Listed in #34 so the answers land on GitHub: (1) give up vs. stealth as the main way a hunt
 ends; (2) how the escorts form their depth estimate; (3) whether the target table and the
 `veteran` numbers feel right; (4) whether a straight flank run away may stay a battery-costly
-escape or the stern chase must be made deadly.
+escape or the stern chase must be made deadly. Plus Q1 to Q6 on the detection rework
+(section 3.1). The owner's direction of 2026-10-25 did not mention sections 3.2 to 3.4, which
+stand as proposed until said otherwise.
 
 ## Appendix: the study
 
