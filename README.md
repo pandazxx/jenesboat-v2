@@ -104,6 +104,8 @@ numbers.
 - How an LLM agent tests a build (headless sim, browser driver): `docs/AGENT_TESTING.md`.
 - How user and agent collaborate (requirements, issues, acceptance tests, reviews):
   `docs/AGENT_WORKFLOW.md`.
+- Balance notes: `docs/ESCAPE_BALANCE.md` (can a found boat get away; measured with
+  `scripts/escape_study.py`).
 
 ```sh
 just sync        # install dependencies
