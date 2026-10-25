@@ -1,7 +1,8 @@
 # Escape balance: a found boat should be able to get away
 
 Status: brainstorm and proposal, 2026-10-24; detection section reworked to the owner's
-direction on 2026-10-25 (section 3.1). Requirement issue #34 (decisions go there), bug
+direction on 2026-10-25 (section 3.1); after the owner's review of the second-prototype
+stories the brainstorm went back to mental models (section 7), which is where it stands. Requirement issue #34 (decisions go there), bug
 #35 (the stern chase stalemate found on the way). Nothing in this page is implemented yet;
 the numbers come from `scripts/escape_study.py`, a headless harness that plays a found boat
 against the escorts with fixed evasion recipes, under the current rules and under a
@@ -300,6 +301,87 @@ boat? It undoes the shelter in the fleet (section 4, second prototype). Options:
 hold course until an escort has a sighting or a torpedo is observed; or they run only when
 the fix is within some distance of them; or keep today's rule and accept that shelter only
 helps a boat that has not been alarmed on. Not blocking PR 1.
+
+## 7. Mental models for a silent escape (brainstorm, 2026-10-25)
+
+Status: posted on #34 for agreement; nothing here is decided or measured. It supersedes the
+*expected effect* paragraphs of sections 3.1 and 4 as the direction of the next prototype.
+
+The owner's review of the second-prototype stories (#34, 2026-10-25) made three points: the stories' opening was inconsistent, the depth charges never changed depth, and once pinned the boat never escapes by stealth, it only survives until the hunter gives up. The third is the one that matters and sends the brainstorm back to first principles. First the two defects, then the diagnosis, then the mental models, then imagined stories of how a hunt *should* go, then what I would check next (no implementation yet).
+
+#### The two defects in the stories
+
+1. **"Found by sonar at 3 km" with a 2,100 m reach is a contradiction.** The study plants a fix at the boat's position and calls it a sonar contact whatever the range. That is not an opening that can happen. A hunt opens in one of four ways and each gives the hunter different knowledge; the stories must start from a real one (section "Openings" below). The 3 km cases should have been "periscope sighted at 1.5 km" or "boat seen diving at 5 km".
+2. **The charges stayed at 15 to 27 m for four runs** because the prototype's rule was "walk the estimate deeper only after a run with *no* damage", and a shallow pattern 35 m above the boat still scratches it (3 to 10 %), which the rule read as "right depth". A hunter would not do that. Depth has to be a search of its own (model 4 below).
+
+#### Diagnosis: a budget the boat can never meet
+
+Strip the hunt to one question: *after each attack, is the boat outside the hunter's reach when the hunter looks again?* Every attack ends with the hunter blind for 60 to 120 s (under the keel, then the boat in its baffles while it turns). In that window the boat moves:
+
+| boat | in 60 s | in 120 s |
+| --- | --- | --- |
+| creeping, 1.9 kn | 60 m | 120 m |
+| AHEAD HALF, 3.8 kn | 120 m | 235 m |
+| flank, 7.6 kn | 235 m | 470 m |
+
+The hunter's reach when it looks again is 2,100 m for a creeping boat and 3,000 m for a moving one, and its search starts at the predicted position with a 400 m box. The boat is never further than a few hundred metres from where it is expected and never outside the reach. **Nothing the boat does changes the reach by more than 30 %** (the creep bonus). So the only ways a hunt ends are the hunter finding the depth or the hunter giving up, exactly what you saw. The leash and the time limit are not wrong, but they must be the backstop, not the ending.
+
+The historical boats that got away did so because the escort *lost the echo*: a slow, deep, end-on boat under a temperature layer, in the disturbed water left by the explosions, gave an echo the operator could not hold, and the escort then searched the wrong patch of sea. Every one of those factors is a lever the player can pull, and none exists in the sim today.
+
+#### Mental models
+
+**1. Contact is a quality, not a range.** The echo the hunter gets back is a number, *echo strength*, and the fix exists only while it is above the set's threshold. Echo strength falls with range, and is multiplied by what the boat is doing:
+
+| factor | strong echo | weak echo | why |
+| --- | --- | --- | --- |
+| aspect | beam-on to the hunter (x1.0) | bow-on or stern-on (x0.4) | a hull broadside returns far more sound than a bow; end-on was the classic evasion |
+| speed | flank (x1.0) | creep (x0.7, as today) | screw noise and wake |
+| depth | above the layer (x1.0) | below the layer (x0.5), a layer depth per hunt | sound bends away at the thermocline |
+| water | clear | behind a merchant's noise (x0), in an explosion cloud (x0), behind a knuckle (x0 for a minute) | your noise shadows, extended to two more sources |
+| the set | 14 kn, settled | sprinting (x0.25), settling (x0), turning hard (x0.5) | the set hears nothing through its own screws and wake |
+
+The hunter's *effective reach* is the range at which this product drops under the threshold. A creeping, deep, end-on boat under the layer gives 3,000 x 0.7 x 0.4 x 0.5 = **420 m**. Now the budget closes: the boat opens 235 m at flank in a 60 s blind window, turns end-on, slows, and the hunter looking again at 420 m reach from a prediction that is 100 to 200 m wrong has a real chance of hearing nothing. Without the layer it is 840 m, which the explosion cloud (next model) covers.
+
+The player must *see* this: a **stealth gauge** on the HUD, the boat's current echo strength (or the range at which a settled set would hold it), next to the escorts' ring. The ring says what they know; the gauge says how loud you are. Turning the bow toward the hunter and watching the gauge fall is the skill the game is about.
+
+**2. The attack cycle has a blind window and the sea boils afterwards.** Each run is: hold contact at 14 kn, lose it under the keel at 180 m, hold course, drop, overrun, turn. From the drop, the pattern leaves a **cloud** of disturbed water 100 to 150 m across that is a noise shadow for 2 to 3 minutes (the ASDIC was useless through it). The hunter's own hard turn leaves a short knuckle. The boat's one move per cycle happens in that window: change course (end-on to where the hunter will come back from), change depth, change speed, and if possible put the cloud between itself and the hunter. A boat that uses the window well is heard again only by luck; one that does not (holds course, or sits) is re-acquired exactly as today.
+
+**3. Openings: four ways to be found, four different starts.** What the hunter knows at t = 0 decides the whole hunt:
+
+| opening | position | depth | course | the boat's lead |
+| --- | --- | --- | --- | --- |
+| periscope sighted (1.5 km by day) | exact | 12 m, known | no | 2 to 3 min until the first charges; the boat is 200 to 400 m from the sighting |
+| seen diving at long range (lookouts 9 km, radar 20 km at `veteran`) | the dive point, exact, but minutes old | unknown, deeper every minute | the last surface course | 5 to 15 min; the hunter comes to a point the boat left long ago and must search |
+| torpedo observed | a line, up to 5 km long | unknown | no | the hunter sweeps the line from the target outward; a boat that fired from 2 km and turned off the line has 5 min or more |
+| sonar contact (inside the screen, under 1 km typically) | an area ring, 75 m | unknown | after 3 fixes | none; this is the dangerous one, and the one the shadows and the layer are for |
+
+The study's "found at 3 km" cases are really the second and third openings, and they should be modelled as such.
+
+**4. Depth is a search of its own.** The escorts never measure depth. They hold a *band* guess (shallow 15 to 40 m, medium 40 to 80 m, deep 80 to 150 m) from the opening: periscope sighting -> shallow; dived N minutes ago -> the band the boat could have reached; sonar only -> medium. Each pattern is set in one band. Evidence moves the guess: a pattern that does real damage (10 % or more) confirms the band; one that does nothing moves to the next band in a fixed order (shallow, medium, deep, then back to shallow); oil or debris would confirm (later). Damage falls off faster in depth than it does today (narrower lethal/damage radii in the vertical, or simply a 25 m band spacing with 15 m layers), so a wrong band is a miss, not a scratch. The player can read the set depth in the log and the HUD and act on it: *they are set shallow, go deep now; they have found 60 m, change depth before the next run*.
+
+**5. The convoy comes first.** One ship hunts, the rest screen, and the hunt ends when the convoy's safety says so: the leash (10 km) and the time limit (30 min) stay as a backstop and as the end condition for #24. But with model 1 and 2 in place, most escapes should be *track lost* (the hunter searched and heard nothing for 5 min), and give-up should be the exception. That is the target I would write: at `patrol`, periscope sighted at 1.5 km, a boat that uses the blind window (turn end-on, change depth, creep, cloud between) is lost by the hunter in most hunts; one that holds course or sits is found again every time.
+
+**6. The boat's verbs.** Everything above gives the player a vocabulary: *slow* (creep), *deep* (and under the layer), *end-on* (aspect), *shadow* (merchant, cloud, knuckle), *move in the window* (course and depth change during the attack), later *decoy* (Bold) and *surface and run* (at night, when a surfaced boat at 17 kn outruns the search and radar is the counter at `veteran`). The HUD gauge makes each verb visible as it is used.
+
+#### Imagined stories under these models
+
+**A. Periscope seen, the boat gets away (the hunt we want).** Day, `patrol`. The boat is at periscope depth 1,400 m off the convoy's bow when the lead destroyer's lookouts see the feather. Log: `destroyer-1 sighted our periscope`. The ring on the HUD is a dot: they know exactly where the boat is, and that it is shallow. The player orders 90 m (below the layer at 70 m this hunt) and AHEAD FULL, and turns 60° off, toward the convoy's wake. The hunter arrives in 2 min 20 s and drops where the periscope was, shallow band; the boat is 450 m away and 60 m down, hears the pattern go off behind it, and the HUD shows the cloud. The player slows to creep and turns the stern to the hunter. The hunter comes out of its turn, settles, and listens: the boat is end-on, creeping, under the layer, 600 m away behind its own explosion cloud: echo strength under the threshold. Log: `destroyer-1 lost the echo`. It searches a box around the sighting, hears nothing for five minutes, and the log says `escorts lost the track`. The gauge was in the green from the moment the boat went end-on; the player watched it and never saw a second ring.
+
+**B. The same opening, lost.** The player dives to 60 m (above the layer) and runs straight away at flank. The hunter's first pattern falls short, but the boat is beam-on to the hunter during its turn, loud at flank, above the layer: the echo is strong at 900 m, the ring reappears at 100 m radius, and the course estimate is good because the boat is running straight. Second run: medium band, bracketed, 40 % damage. The player now goes deep and slows, but the hunter has a fresh fix and a band that works: third run, lost. Lesson the HUD taught: the gauge was red the whole time it ran straight.
+
+**C. Seen diving at 6 km.** Dawn, the boat surfaced, running in on the diesels; `destroyer-2` sees it at 6 km. The player dives. The escorts know the dive point exactly, but the hunter needs 9 min at 20 kn to get there, deaf all the way, and the boat has made 1,000 m under the layer at AHEAD HALF, then crept and turned end-on. The hunter's search box starts at the dive point with a 400 m radius and widens 1 m/s. If the boat is beyond the box and quiet, the search runs out at 5 min; if the player kept running at flank above the layer, the box catches the wake noise at 1,500 m and the hunt is on. Here the opening gives the boat a head start and the models decide whether it keeps it.
+
+**D. Torpedo seen.** The boat fires from 2,200 m on the beam; the escorts hear the torpedo and get the track line. The hunter sweeps the line from the target outward at 14 kn, pinging each side; the boat that turned 90° off the line immediately after firing and crept is 300 m off the line, end-on, deep, when the hunter passes 1 km later; echo weak, the sweep continues to 5 km and finds nothing. The boat that stayed on the line to watch the hit through the periscope is caught in the sure zone with a shallow-band first pattern.
+
+**E. Caught in the screen (the one that should be deadly).** The boat crept into the convoy's gap at periscope depth and `destroyer-1`, 700 m away and settled at 12 kn, gets a strong echo: a 60 m ring. There is no window before the first run and the band guess is shallow because the sonar reach says the boat is near the surface (a deep boat at 700 m would be in the blind zone soon). The boat's only play is the merchants: inside the convoy the hunter's pings are blocked by freighters half the time (your shadows), and a boat that uses the 2 minutes a shadow buys to go deep and end-on has a chance; one that stays shallow is lost in the first pattern, as it should be.
+
+#### What I would do next (still no implementation)
+
+1. Agree the mental models, or strike the ones you do not want. The ones that do the work for silent escape are 1 (echo strength with aspect and layer), 2 (the explosion cloud as a shadow), and 4 (depth bands). The HUD gauge is the player's half of model 1.
+2. Rebuild the study's openings from model 3 (periscope sighted, seen diving, torpedo line, sonar contact in the screen) and make the stories start from those, so the first row is consistent with the hunter's sonar.
+3. Prototype models 1, 2 and 4 in the study and render the five stories above from the sim, then compare against the imagined versions: where they differ is where the numbers (aspect factor, layer factor, cloud duration, threshold) need tuning or where the model is wrong.
+4. Only then write the requirement's acceptance criteria and the parameter sheet.
+
 
 ## Appendix: the study
 
