@@ -3,7 +3,8 @@
 Status: brainstorm and proposal, 2026-10-24; detection section reworked to the owner's
 direction on 2026-10-25 (section 3.1); after the owner's review of the second-prototype
 stories the brainstorm went back to mental models (section 7) and, on 2026-11-01, to the
-player archetypes (section 8), which is where it stands. Issue #34 holds the record up to
+player archetypes (section 8) and the owner's answers of 2026-11-01 (section 9), which is
+where it stands. Issue #34 holds the record up to
 that point and is closed; the discussion continues on #37. Requirement issue #37 (decisions go there; #34 is the closed record), bug
 #35 (the stern chase stalemate found on the way). Nothing in this page is implemented yet;
 the numbers come from `scripts/escape_study.py`, a headless harness that plays a found boat
@@ -332,7 +333,7 @@ The historical boats that got away did so because the escort *lost the echo*: a 
 
 #### Mental models
 
-**1. Contact is a quality, not a range.** The echo the hunter gets back is a number, *echo strength*, and the fix exists only while it is above the set's threshold. Echo strength falls with range, and is multiplied by what the boat is doing:
+**1. Contact is a quality, not a range.** *Dropped by the owner on 2026-11-01 (#37): no aspect, no thermocline, no stealth gauge; the detection rules stay as decided in section 3.1 and the silent escape comes from geometry and timing, see section 9.* The echo the hunter gets back is a number, *echo strength*, and the fix exists only while it is above the set's threshold. Echo strength falls with range, and is multiplied by what the boat is doing:
 
 | factor | strong echo | weak echo | why |
 | --- | --- | --- | --- |
@@ -416,6 +417,34 @@ top-notch one from its own opening (a torpedo as a lure), as the specification t
 the sim must then reproduce. Two questions on #37 first: the cost of "ever deeper" (safe depth
 vs damage, the bands, or both), and whether the returning escort's wake and baffles are a
 shadow the boat may ride at periscope depth or deep only.
+
+## 9. Answers of 2026-11-01 (#37) and what is left for a silent escape
+
+- **Model 1 dropped.** The boat cannot make its echo weaker. It can only not be where the ping
+  goes, or be behind something.
+- **Why "a straight flank run is the safest recipe and 150 m is free" had to change.** Both
+  make the *panic* archetype succeed under today's rules: the stern chase stalemate (#35,
+  section 1) is never hit and never ends; and depth costs nothing while it helps twice (the
+  blind zone grows with depth, deep-set charges take 50 s to sink), so "dive to 150 m and run"
+  was never hit in the first prototype.
+- **The cost of "ever deeper", recommended both:** (A) a safe depth that shrinks with hull
+  damage, `safe_depth = max_depth x (1 - damage)`, below which the hull takes damage at a rate
+  growing with the excess (sketch 1 % per 10 s per 20 m), announced in the log and HUD; (B)
+  the depth bands of model 4. A makes the panic dive fail for a legible reason and turns deep
+  into a resource (once, while the hull is sound); B is how the escorts search depth anyway.
+  Slower diving or a battery cost would punish the veteran move too and are not proposed.
+- **The returning escort's wake and baffles are a shadow the boat may ride at periscope depth
+  with the periscope lowered.** New boat state: periscope raised / lowered, a player order
+  (key `V`, touch `SCOPE`); lowered = invisible to lookouts at 12 to 14 m but blind (hydrophone
+  only), can fire on hydrophone bearings; going deep lowers it, coming up does not raise it.
+  The scope state is part of the visual rule only, never of sonar.
+- **The tools that remain** (all decided or proposed): the blind window; the explosion cloud
+  (model 2); merchants' noise shadows; the escort's own wake and baffles; the creep bonus on
+  the sheet; the faint-echo chance; depth change between runs. The two numbers that now carry
+  the silent escape are the cloud (size, duration) and the hunter's reach after the blind
+  window; the archetype stories must settle them.
+- **Next:** the five archetype stories as imagined tables from these tools only, same opening
+  at `patrol` (periscope sighted at 1.5 km, day), top-notch from a torpedo lure.
 
 ## Appendix: the study
 
