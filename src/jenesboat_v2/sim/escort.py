@@ -305,7 +305,12 @@ def _refresh_datum(
         band = old.band
     history = tuple(f for f in (old.fixes if old else ()) if t - f[0] <= p.track_window)
     fixes = (*history, (t, x, y))
-    keep = {"band": band, "search_since": old.search_since if old else None}
+    keep = {
+        "band": band,
+        "search_since": old.search_since if old else None,
+        "attacks": old.attacks if old else 0,
+        "run_damage": old.run_damage if old else 0.0,
+    }
     if len(fixes) < 3 or t - fixes[0][0] < p.track_min_baseline:
         return Datum(x, y, t, reason, 0.0, 0.0, fixes, ring=ring, **keep)
     # Least-squares line through the fixes: the position now and the velocity, with the noise
