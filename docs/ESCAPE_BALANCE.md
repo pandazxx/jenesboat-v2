@@ -4,8 +4,8 @@ Status: brainstorm and proposal, 2026-10-24; detection section reworked to the o
 direction on 2026-10-25 (section 3.1); after the owner's review of the second-prototype
 stories the brainstorm went back to mental models (section 7) and, on 2026-11-01, to the
 player archetypes (section 8) and the owner's answers of 2026-11-01 (sections 9 and 10) and the
-archetype stories (section 11, `docs/ESCAPE_STORIES.md`) and the sonar arc question
-(section 12), which is where it stands. Issue #34 holds the record up to
+archetype stories (section 11, `docs/ESCAPE_STORIES.md`) the sonar arc question
+(section 12) and the proposed parameter sheet (section 13), which is where it stands. Issue #34 holds the record up to
 that point and is closed; the discussion continues on #37. Requirement issue #37 (decisions go there; #34 is the closed record), bug
 #35 (the stern chase stalemate found on the way). Nothing in this page is implemented yet;
 the numbers come from `scripts/escape_study.py`, a headless harness that plays a found boat
@@ -523,6 +523,49 @@ the panic flight (the blind lead must point the cone down the assumed line). Rec
 at every level and the cone drawn for every destroyer the boat holds; rerun the archetype
 stories with it. Open: cone fixed to the heading or a trainable beam within the arc (or
 both); the cone shown always or only once that destroyer has pinged the boat.
+
+## 13. Proposed parameter sheet (2026-11-01, before implementation)
+
+The owner asked whether the baffles are a parameter (yes) and for the proposed parameter
+table before the next implementation. One parameter, `arc` (half-angle off the bow the set
+can be trained), replaces `baffle_angle`: the baffles are the rest of the circle. Status
+marks: **decided** (owner, #34 / #37), **proposed** (in this note, not yet agreed), **open**.
+
+| block . parameter | meaning | cadet | patrol | veteran | status |
+| --- | --- | --- | --- | --- | --- |
+| sonar `range` | reach against a beam-on moving boat, settled set | 2,400 | 3,000 | 3,600 m | unchanged |
+| sonar `arc` | half-angle off the bow the set can be trained (replaces `baffle_angle`) | 45 | 70 | 90 deg | open: heading-fixed, trainable beam, or both |
+| sonar `beam`, `train_step` | if trainable: beam width, degrees per ping | 15, 15 | 15, 15 | 15, 20 deg | open |
+| sonar `depth_blind_ratio`, `blind_zone_cap`, `min_range` | echo lost inside `depth x ratio`, capped, floored | 4, 300, 150 | 3, 300, 150 | 2.5, 300, 150 m | decided / cap proposed |
+| sonar `own_noise_speed`, `own_noise_factor`, `settle_time`, `turn_factor` | the set's state: sprinting, settling, hard turn | 15 kn, 0.25, 20 s, 0.5 | same | same | decided / proposed |
+| sonar `quiet_speed`, `quiet_factor` | `f_speed` | 2.5 kn, 0.7 | same | same | unchanged |
+| sonar `aspect_floor` | `f_aspect = floor + (1 - floor) x |sin aspect|` | 0.3 | 0.4 | 0.5 | model 1 accepted, numbers proposed |
+| sonar `layer_factor` | reach below the thermocline | 0.4 | 0.5 | 0.6 | model 1 accepted, numbers proposed |
+| sonar `sure_fraction` | sure echo inside this fraction of `R_eff` | 0.4 | 0.4 | 0.5 | decided |
+| sonar `area_base`, `area_span` | ring = `base + span x d / R_eff` | 25, 150 m | same | same | decided |
+| sonar `noise_base`, `noise_per_knot` | a friendly ship's noise radius (shadow) | 150 m, 30 m/kn | same | same | decided, numbers proposed |
+| sonar `cloud_radius`, `cloud_duration` | the pattern's explosion cloud (shadow) | 150 m, 240 s | 150 m, 180 s | 150 m, 120 s | proposed |
+| sonar removed | `position_error`, `interference_*` | | | | decided |
+| sea `layer_min`, `layer_max`, `layer_chance` | the thermocline of this hunt | 40-90 m, 1.0 | 40-90 m, 1.0 | 40-90 m, 0.7 | proposed |
+| depth charge `bands` | search order of the pattern's depth bands | 15-40, 40-80, 80-150 m | same | same | proposed, replaces `depth_error` |
+| depth charge `confirm_damage` | a pattern doing at least this confirms its band | 0.10 | 0.10 | 0.10 | proposed |
+| depth charge `pattern_cooldown` | rack reload | 150 | 120 | 90 s | proposed |
+| depth charge `run_max_time` | run-over release gives up after this (#35) | 40 s | 40 s | 40 s | proposed |
+| escort `datum_attack_age` | attack the dead-reckoned position with a fix up to this old | 120 | 180 | 240 s | proposed |
+| escort `blind_lead_speed` | assumed straight flight after a failed datum attack | 7 kn | 7 kn | 7 kn | proposed |
+| escort `hunt_leash`, `max_hunt_time` | the backstop | 6 km, 15 min | 10 km, 30 min | 15 km, 60 min | proposed |
+| escort `lose_track_time` | from the hunter's arrival at the datum | 180 | 300 | 480 s | numbers unchanged, clock changed |
+| escort `escort_search` | `sweep` (points the cone across the box) | sweep | sweep | sweep | proposed |
+| escort torpedo datum, stand-down reasons, intention state | | | | | decided / proposed |
+| boat safe depth, `overdepth_rate` | `max_depth x (1 - damage)`; damage per second per 20 m below it | 0.0005 | 0.001 | 0.0015 | proposed |
+| boat periscope raised / lowered, `scope_raise_time` | player order `V` / `SCOPE` | 5 s | 5 s | 5 s | decided / proposed |
+| radar `range` | surfaced vessels only, exact | none | none | 20,000 m | decided |
+| merchants, detection | unchanged (`alert_duration` 600 s is what the lure relies on) | | | | decided |
+| HUD | one indicator per subject; ring, line, intention, cone (open: always or after the first ping), set depth, layer once crossed, safe depth, `ECHO <m>` | | | | decided / open |
+
+Levels in one line: `cadet` a narrow cone, a long cloud, a thick layer, forgiving sprint and
+reload, a short leash; `patrol` the base; `veteran` a near-half-circle cone, three sets, a thin
+layer that may be absent, a short cloud, radar, a long leash and memory.
 
 ## Appendix: the study
 
