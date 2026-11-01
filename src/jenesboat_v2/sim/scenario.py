@@ -65,6 +65,9 @@ def hunting_scenario(
         width=WORLD_SIZE, height=WORLD_SIZE, player=player, ships=ships, difficulty=difficulty
     )
     world.rng = random.Random(rng.random())
+    sea = rules.sea
+    if rng.random() < sea.layer_chance:
+        world.layer_depth = round(rng.uniform(sea.layer_min, sea.layer_max))
     rx = cx + rng.uniform(-INTEL_POSITION_ERROR, INTEL_POSITION_ERROR)
     ry = cy + rng.uniform(-INTEL_POSITION_ERROR, INTEL_POSITION_ERROR)
     reported_course = wrap_degrees(course + rng.uniform(-INTEL_COURSE_ERROR, INTEL_COURSE_ERROR))

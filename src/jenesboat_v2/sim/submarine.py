@@ -22,10 +22,40 @@ class Submarine(Vessel):
     tubes: Tubes = field(default_factory=Tubes)
     fired: int = 0
     damage: float = 0.0  # 0 (sound) .. 1 (lost), from depth charges; never repaired
+    scope_wanted: bool = (
+        True  # the periscope is ordered up (lowered by going deep, not by coming up)
+    )
+    scope_timer: float = 0.0  # s the scope has been rising
 
     @property
     def destroyed(self) -> bool:
         return self.damage >= 1.0
+
+    @property
+    def safe_depth(self) -> float:
+        """How deep the hull can go without groaning: shrinks with the damage taken."""
+        return self.spec.max_depth * (1.0 - self.damage)
+
+    @property
+    def at_periscope_depth(self) -> bool:
+        return SURFACED_DEPTH <= self.depth <= self.spec.periscope_depth + self.spec.periscope_band
+
+    @property
+    def scope_up(self) -> bool:
+        """The periscope is raised: the boat sees, and its feather can be seen."""
+        return (
+            self.scope_wanted
+            and self.at_periscope_depth
+            and self.scope_timer >= self.spec.scope_raise_time
+        )
+
+    def toggle_scope(self) -> bool:
+        """Raise or lower the periscope (``V``); returns the new wanted state.  Raising takes
+        ``scope_raise_time``; lowering is immediate."""
+        self.scope_wanted = not self.scope_wanted
+        if not self.scope_wanted:
+            self.scope_timer = 0.0
+        return self.scope_wanted
 
     # --- depth -----------------------------------------------------------------------------
 
@@ -35,8 +65,8 @@ class Submarine(Vessel):
 
     @property
     def periscope_usable(self) -> bool:
-        """At periscope depth (give or take the band) and not on the surface."""
-        return SURFACED_DEPTH <= self.depth <= self.spec.periscope_depth + self.spec.periscope_band
+        """At periscope depth (give or take the band), not on the surface, scope raised."""
+        return self.scope_up
 
     @property
     def hydrophone_usable(self) -> bool:
@@ -120,6 +150,11 @@ class Submarine(Vessel):
             self.depth += delta
         else:
             self.depth -= delta
+        if self.depth > self.spec.periscope_depth + self.spec.periscope_band:
+            self.scope_wanted = False  # going deep lowers the scope; coming up does not raise it
+            self.scope_timer = 0.0
+        elif self.scope_wanted and self.at_periscope_depth:
+            self.scope_timer = min(self.scope_timer + dt, self.spec.scope_raise_time)
         self.battery = clamp(self.battery + self.battery_rate() * dt, 0.0, 1.0)
         self.tubes.step(dt)
         super().step(dt)
@@ -134,6 +169,8 @@ class Submarine(Vessel):
         data["tubes"] = self.tubes.snapshot()
         data["can_fire"] = self.can_fire
         data["damage"] = round(self.damage, 2)
+        data["scope"] = "up" if self.scope_up else ("rising" if self.scope_wanted else "down")
+        data["safe_depth"] = round(self.safe_depth)
         return data
 
 
@@ -145,5 +182,11 @@ def new_submarine(
     torpedo: TorpedoParams = G7E,
 ) -> Submarine:
     return Submarine(
-        params=spec.vessel, spec=spec, x=x, y=y, heading=heading, tubes=Tubes(params=torpedo)
+        params=spec.vessel,
+        spec=spec,
+        x=x,
+        y=y,
+        heading=heading,
+        tubes=Tubes(params=torpedo),
+        scope_timer=spec.scope_raise_time,
     )

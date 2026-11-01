@@ -78,6 +78,8 @@ def ship_detection_range(
     if sub.surfaced:
         base = det.surfaced_range
     elif sub.depth <= det.periscope_max_depth:
+        if not sub.scope_up:
+            return 0.0  # the scope is down: nothing shows above the water
         excess = max(0.0, abs(sub.speed) - det.periscope_quiet_speed)
         base = det.periscope_range + det.periscope_speed_penalty * excess
     else:

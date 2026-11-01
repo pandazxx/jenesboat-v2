@@ -44,14 +44,30 @@ def test_escort_balance_relations_hold_at_every_level(name):
     # A destroyer out-hunts a merchant, but sprinting deafens its own sonar.
     assert P.DESTROYER.vessel.max_speed > P.FREIGHTER.vessel.max_speed
     assert ai.attack_speed > sonar.own_noise_speed >= ai.approach_speed
-    # Sonar outreaches a periscope lookout, yet the fleet's own noise can drown it.
+    # Sonar outreaches a periscope lookout even against a creeping boat, but an end-on boat
+    # under the layer can be held only a few hundred metres out.
     assert sonar.range * sonar.quiet_factor > det.periscope_range * P.DESTROYER.lookout
-    assert sonar.range * sonar.interference_floor < det.periscope_range * 2
-    assert sonar.min_range < sonar.range * sonar.interference_floor
-    # Charges: lethal inside damage, a boat cannot be lost to a single distant burst.
+    quietest = sonar.range * sonar.quiet_factor * sonar.aspect_floor * sonar.layer_factor
+    assert sonar.min_range < quietest < 1_000.0
+    assert 0 < sonar.aspect_floor < 1 and 0 < sonar.layer_factor < 1
+    assert 0 < sonar.arc <= 180 and sonar.min_range <= sonar.blind_zone_cap
+    assert 0 < sonar.sure_fraction < 1 and sonar.area_base < sonar.area_span
+    assert sonar.cloud_duration > sonar.ping_interval * 4
+    # Charges: lethal inside damage, a boat cannot be lost to a single distant burst; the
+    # depth bands tile the water from the shallowest setting to the boat's maximum depth.
     assert dc.lethal_radius < dc.damage_radius and 0 < dc.damage < 1
     assert dc.magazine >= dc.pattern_size * 2
+    assert dc.bands[0][0] >= 15.0 and dc.bands[-1][1] == rules.submarine.max_depth
+    assert all(a[1] == b[0] for a, b in zip(dc.bands, dc.bands[1:], strict=False))
+    assert 0 < dc.confirm_damage < dc.damage
+    assert dc.pattern_cooldown >= dc.run_max_time
     assert ai.lose_track_time > sonar.ping_interval * 10
+    assert ai.datum_attack_age > 60.0 and ai.blind_attacks >= 1
+    assert ai.hunt_leash > ai.screen_distance and ai.max_hunt_time > ai.lose_track_time
+    # The boat: deep is a resource that shrinks with damage; radar sees surfaced boats only.
+    assert rules.submarine.overdepth_rate > 0
+    assert rules.radar.range == 0 or rules.radar.range > det.surfaced_range * P.DESTROYER.lookout
+    assert 0 < rules.sea.layer_min < rules.sea.layer_max < rules.submarine.max_depth
     assert ai.max_hunters >= 1 and ai.hunters_per_escort >= 1
     # The torpedo and the boat stay the same weapon and hull, whatever the reload time.
     assert rules.torpedo.speed == P.G7E.speed and rules.torpedo.reload_time > 0

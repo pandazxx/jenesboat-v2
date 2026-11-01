@@ -26,7 +26,7 @@ def level(evade: str = "comb", glance_chance: float = 1.0) -> Difficulty:
     rules = replace(
         P.PATROL.rules,
         torpedo_hit=replace(TORPEDO_HIT, glance_chance=glance_chance),
-        sonar=replace(P.SONAR_ASDIC, position_error=0.0),
+        sonar=replace(P.SONAR_ASDIC, area_base=0.0, area_span=0.0),
     )
     return replace(
         P.PATROL,
