@@ -111,19 +111,28 @@ def test_a_stale_fix_gets_one_datum_attack_then_a_blind_lead_along_the_approach_
     assert world.datum is not None
     sub = world.player
     sub.x, sub.y = C + 2_000.0, C - 10_000.0  # the boat is gone: no more echoes
-    evs = run(world, 400)
-    names = kinds(evs)
+    names: list[str] = []
+    lead = None
+    for _ in range(60):  # up to 600 s, stopping the moment the blind lead is announced
+        evs = run(world, 10)
+        names += kinds(evs)
+        lead = next((e for e in evs if e["event"] == "blind_lead"), None)
+        if lead is not None:
+            break
     assert "depth_charge_run" in names  # the datum attack on the dead-reckoned position
-    assert "blind_lead" in names
-    lead = next(e for e in evs if e["event"] == "blind_lead")
+    assert lead is not None
     datum = world.datum
     assert datum is not None and datum.assumed
     speed = math.hypot(datum.vx, datum.vy)
-    assert math.isclose(speed, world.rules.escort_ai.blind_lead_speed)
-    assert (
-        abs(((math.degrees(math.atan2(datum.vx, datum.vy)) - lead["heading"]) + 180) % 360 - 180)
-        < 2
-    )
+    assert math.isclose(speed, world.rules.escort_ai.max_track_speed)
+    heading = math.degrees(math.atan2(datum.vx, datum.vy)) % 360
+    assert abs((heading - lead["heading"] + 180) % 360 - 180) < 2
+    # Straight away from where the finder was when it found the boat.
+    fx, fy = datum.origin_from
+    ox, oy, _ = datum.origin
+    from jenesboat_v2.sim.geo import bearing
+
+    assert abs((bearing(fx, fy, ox, oy) - lead["heading"] + 180) % 360 - 180) < 30
 
 
 def test_after_the_blind_attacks_the_hunter_searches_and_the_track_is_lost():
@@ -184,8 +193,7 @@ def test_the_hunt_ends_on_the_leash_and_on_the_clock():
     assert world.datum is not None
     escorts = [s for s in world.ships if s.kind == "military"]
     h = escorts[0]
-    cx = sum(m.x for m in world.merchants) / 3
-    cy = sum(m.y for m in world.merchants) / 3
+    cx, cy = world.hunt_from
     h.x, h.y = cx + world.rules.escort_ai.hunt_leash + 500.0, cy
     evs = run(world, 1)
     down = next(e for e in evs if e["event"] == "escort_stand_down")

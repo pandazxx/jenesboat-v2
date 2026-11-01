@@ -343,9 +343,8 @@ def test_a_depth_charge_run_is_a_pattern_spread_over_an_area_and_layered_in_dept
     spread = max(distance(a.x, a.y, b.x, b.y) for a in run_charges for b in run_charges)
     assert spread >= 5.0  # an area, not one point
     hunter = next(d for d in destroyers(world) if d.escort.mode == HUNT)
-    assert all(
-        distance(hunter.x, hunter.y, c.x, c.y) < 600.0 for c in run_charges
-    )  # thrown from the ship, not magic
+    # Thrown from the ship as it reached each aim point (a run can last a minute and a half).
+    assert all(distance(hunter.x, hunter.y, c.x, c.y) < 1_500.0 for c in run_charges)
 
 
 def test_a_boat_that_circles_is_still_depth_charged_without_the_hunter_crossing_its_path():

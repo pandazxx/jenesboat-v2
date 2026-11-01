@@ -29,6 +29,7 @@ The major enemy ship types are merchant and military ships. They offen comes in 
 | Q     | rudder amidships                                         |
 | Space | surfaced -> periscope depth -> surfaced; deep -> periscope depth |
 | C     | go deep (60 m)                                           |
+| V     | raise / lower the periscope (lowered: invisible to lookouts, but blind; going deep lowers it) |
 | F     | fire a torpedo along the heading                         |
 | T     | next target (cycles through the contacts; otherwise the nearest is the target) |
 | - / = | zoom out / in                                            |
@@ -39,7 +40,9 @@ The major enemy ship types are merchant and military ships. They offen comes in 
 
 On a touch screen (phone or tablet, held sideways) the web build shows the same orders as
 on-screen buttons: `AHEAD` / `ASTERN` (W / S), `PORT` / `STBD` (held, A / D), `MID` (Q),
-`DIVE` / `DEEP` / `FIRE` / `TGT` (Space / C / F / T), a row under the HUD with `PAUSE`,
+`DIVE` / `DEEP` / `SCOPE` / `FIRE` / `TGT` (Space / C / V / F / T) and `LOG` (downloads the
+whole run's events as a battle log, JSON lines; `--log FILE` does the same natively), a row
+under the HUD with `PAUSE`,
 the time compression (`x1` cycles 1-2-4-8-16-32), zoom `-` / `+`, `?` (legend) and `NEW` (R), and
 `YES` / `NO` when the game asks before abandoning a hunt. The game fills the whole screen in
 landscape; in portrait it asks you to turn the phone.
@@ -47,10 +50,11 @@ landscape; in portrait it asks you to turn the phone.
 
 ## Difficulty
 
-Three levels: `cadet` (one destroyer, short sonar and memory, never dodges, lighter charges,
-quick reloads, every hit counts), `patrol` (the default: two destroyers that dodge torpedoes,
-the Milestone 2 balance) and `veteran` (three destroyers, longer sonar reach and memory,
-heavier charges, slow reloads, glancing hits rarely detonate). Pick one
+Three levels: `cadet` (one destroyer with a short sonar, a narrow cone and a short memory,
+never dodges, lighter charges, quick reloads, every hit counts), `patrol` (the default: two
+destroyers that dodge torpedoes, the base sheet) and `veteran` (three destroyers with longer
+sonar reach, a wide cone, radar and a long memory, heavier charges, slow reloads, glancing
+hits rarely detonate). Pick one
 on a web build's start page (what the build index links to), with `?difficulty=<name>` on the
 game page's URL, or with `--difficulty <name>` (native and headless); the HUD tag and the
 objective message name it and `R` keeps it. A difficulty is a set of pluggable AI strategies
@@ -63,6 +67,22 @@ numbers.
 - Depth charges: equiped by enemy military ships.
 - Torpedo: equiped by submarine. Can be fired on submerged or emerged status. Once fired, keep it's speed and course.
 
+
+## The hunt
+
+Once an escort has the boat (a sighting, a sonar echo, radar at `veteran`, or a torpedo it
+heard), it hunts: it steers for where it thinks the boat is, drops a pattern set in one depth
+band, loses the echo under its own keel, comes round and looks again. Its sonar hears only
+inside a cone off its bow and only what gives an echo: a beam-on boat far out, an end-on,
+creeping boat under the thermocline only a few hundred metres away, nothing behind a
+merchant's screws or the boiling water a pattern leaves. The HUD shows what the escorts know
+(their fix on you and how sure they are, the cone of each destroyer, the torpedo track they
+are sweeping) and how loud you are (`ECHO`). A boat that moves in the blind window, turns its
+stern to the hunter, slows, gets under the layer and keeps a shadow between is lost; one that
+sits, runs straight or dives ever deeper (the hull groans below its safe depth, which shrinks
+with damage) is found again. Escorts give up when the search hears nothing, when the hunt
+takes them too far from the convoy, or when it has gone on too long. Design record:
+`docs/ESCAPE_BALANCE.md`, `docs/ESCAPE_STORIES.md`.
 
 ## Art style
 

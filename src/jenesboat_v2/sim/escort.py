@@ -119,6 +119,8 @@ class Datum:
     blind_attacks: int = 0  # of those, how many on the assumed flight
     search_since: float | None = None  # s, when the hunter started searching (the lose-track clock)
     run_damage: float = 0.0  # the boat's hull damage when the last run started
+    origin: tuple[float, float, float] = (0.0, 0.0, 0.0)  # (x, y, t) of the alarm fix
+    origin_from: tuple[float, float] = (0.0, 0.0)  # where the ship that raised the alarm was
 
     def predict(self, t: float, lead_limit: float = ESCORT_AI.lead_limit) -> tuple[float, float]:
         """Where the boat should be at time ``t`` if it holds the course and speed the fixes
@@ -266,6 +268,10 @@ def report(world: World, x: float, y: float, reason: str, by: str, ring: float =
     world.datum = _refresh_datum(world.datum, x, y, t, reason, world.rules.escort_ai, ring, band)
     if fresh:
         world.hunt_since = t
+        world.hunt_from = _convoy(world, world.ship(by))[:2]
+        finder = world.ship(by)
+        world.datum.origin = (x, y, t)
+        world.datum.origin_from = (finder.x, finder.y)
         world.emit("escort_alarm", reason=reason, by=by)
     # The convoy is told and runs for the screen.
     world.alert_group(x, y, "escort", by, quiet=True, radius=MERCHANT_WARNING_RANGE)
@@ -279,8 +285,11 @@ def report_line(world: World, x: float, y: float, heading: float, length: float,
         return
     fresh = world.datum is None
     world.datum = Datum(x, y, t, "torpedo", kind=LINE, heading=heading, length=length, band=0)
+    world.datum.origin = (*project(x, y, heading, length), t)
+    world.datum.origin_from = (x, y)
     if fresh:
         world.hunt_since = t
+        world.hunt_from = _convoy(world, world.ship(by))[:2]
         world.emit("escort_alarm", reason="torpedo", by=by)
     world.emit(
         "torpedo_line", by=by, x=round(x), y=round(y), heading=round(heading), length=round(length)
@@ -310,6 +319,8 @@ def _refresh_datum(
         "search_since": old.search_since if old else None,
         "attacks": old.attacks if old else 0,
         "run_damage": old.run_damage if old else 0.0,
+        "origin": old.origin if old else (x, y, t),
+        "origin_from": old.origin_from if old else (x, y),
     }
     if len(fixes) < 3 or t - fixes[0][0] < p.track_min_baseline:
         return Datum(x, y, t, reason, 0.0, 0.0, fixes, ring=ring, **keep)
@@ -378,6 +389,7 @@ def _assign_roles(world: World, escorts: list[Ship], params: EscortAIParams) -> 
 def _stand_down(world: World, escorts: list[Ship], reason: str = STAND_DOWN_LOST) -> None:
     world.datum = None
     world.hunt_since = None
+    world.hunt_from = None
     for e in escorts:
         e.escort.mode = FORMATION
         e.escort.drop_left = 0
@@ -393,7 +405,7 @@ def _hunt_over(world: World, escorts: list[Ship], p: EscortAIParams) -> str | No
     if world.hunt_since is not None and t - world.hunt_since > p.max_hunt_time:
         return STAND_DOWN_TIME
     hunters = [e for e in escorts if e.escort.mode == HUNT]
-    cx, cy, _, _ = _convoy(world, escorts[0])
+    cx, cy = world.hunt_from if world.hunt_from is not None else _convoy(world, escorts[0])[:2]
     if any(distance(e.x, e.y, cx, cy) > p.hunt_leash for e in hunters):
         return STAND_DOWN_LEASH
     if hunters and all(e.escort.charges <= 0 for e in hunters):
@@ -510,7 +522,11 @@ def _drop(world: World, ship: Ship, p: EscortAIParams, dc: DepthChargeParams) ->
         else world.rng.uniform(0.0, 360.0)
     )
     side = 1.0 if k % 2 == 0 else -1.0
-    ax, ay = project(ax, ay, across, side * world.rng.uniform(0.0, 1.0) * dc.scatter)
+    if datum.assumed:  # on a guess the pattern straddles the assumed path in steps
+        off = dc.blind_scatter * (k // 2 + 1) / max(1, (n + 1) // 2)
+    else:
+        off = world.rng.uniform(0.0, 1.0) * dc.scatter
+    ax, ay = project(ax, ay, across, side * off)
     if distance(ship.x, ship.y, ax, ay) > dc.throw_range:
         return
     world.next_charge_id += 1
@@ -600,18 +616,24 @@ def _hunt(world: World, ship: Ship, dt: float, p: EscortAIParams) -> None:
         and datum.blind_attacks == 0
         and p.blind_attacks > 0
     ):
-        # The hunter has just run over the datum along its approach course; a boat fleeing
-        # from it would have kept going the same way.
-        px, py = datum.predict(t, p.lead_limit)
-        away = ship.heading
+        # The panic assumption: since the last fix the boat has run straight away from the
+        # ship that found it, at its best submerged speed.  The last fix, not the alarm fix,
+        # is the anchor: by then the boat has finished turning away.
+        fx, fy = datum.origin_from
+        away = (
+            bearing(fx, fy, datum.x, datum.y)
+            if distance(fx, fy, datum.x, datum.y) > 1.0
+            else ship.heading
+        )
         rad = math.radians(away)
+        vx, vy = math.sin(rad) * p.max_track_speed, math.cos(rad) * p.max_track_speed
         world.datum = datum = replace(
             datum,
-            x=px,
-            y=py,
+            x=datum.x + vx * (t - datum.t),
+            y=datum.y + vy * (t - datum.t),
             t=t,
-            vx=math.sin(rad) * p.blind_lead_speed,
-            vy=math.cos(rad) * p.blind_lead_speed,
+            vx=vx,
+            vy=vy,
             fixes=(),
             assumed=True,
         )
@@ -626,7 +648,15 @@ def _hunt(world: World, ship: Ship, dt: float, p: EscortAIParams) -> None:
         if near <= dc.throw_range and t >= state.cooldown_until and state.charges > 0:
             _start_run(world, ship, p, dc)
             return
-        _goto(ship, px, py, p.attack_speed if d > p.approach_range else p.approach_speed)
+        # Close at attack speed; slow to listen inside the approach range, unless the chase
+        # is a blind lead (nothing to listen for until the assumed point is reached).  On a
+        # blind lead with the rack still reloading, keep pace over the assumed point rather
+        # than overrun it and have to come back.
+        slow = d <= p.approach_range and not (datum.assumed and d > 2.0 * dc.throw_range)
+        speed = p.approach_speed if slow else p.attack_speed
+        if datum.assumed and t < state.cooldown_until and d <= 2.0 * dc.throw_range:
+            speed = p.max_track_speed + 1.0 * KNOT
+        _goto(ship, px, py, speed)
         _set_intent(world, ship, INTENT_HUNTING)
         return
     if datum.assumed:  # the blind lead is spent: back to a plain stale point

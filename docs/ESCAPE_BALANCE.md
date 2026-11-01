@@ -1,14 +1,11 @@
 # Escape balance: a found boat should be able to get away
 
-Status: brainstorm and proposal, 2026-10-24; detection section reworked to the owner's
-direction on 2026-10-25 (section 3.1); after the owner's review of the second-prototype
-stories the brainstorm went back to mental models (section 7) and, on 2026-11-01, to the
-player archetypes (section 8) and the owner's answers of 2026-11-01 (sections 9 and 10) and the
-archetype stories (section 11, `docs/ESCAPE_STORIES.md`) the sonar arc question
-(section 12) and the proposed parameter sheet (section 13), which is where it stands. Issue #34 holds the record up to
-that point and is closed; the discussion continues on #37. Requirement issue #37 (decisions go there; #34 is the closed record), bug
-#35 (the stern chase stalemate found on the way). Nothing in this page is implemented yet;
-the numbers come from `scripts/escape_study.py`, a headless harness that plays a found boat
+Status: brainstorm and proposal, 2026-10-24 to 2026-11-01 (sections 1 to 13); **implemented
+as build 1 in PR #38** (the hunt rework: sections 3.1, 7, 9, 10, 13 and the two escort rules
+from the stories, section 11). The record of how the rules were arrived at stays here; the
+rules themselves are now in `sim/params.py` and `docs/PARAMETERS.md`. Requirement issue #37
+(decisions go there; #34 is the closed record), bug #35 (the stern chase stalemate, fixed by
+the run-over release). The numbers in sections 1 to 6 come from `scripts/escape_study.py`, a headless harness that plays a found boat
 against the escorts with fixed evasion recipes, under the current rules and under a
 monkeypatched prototype of the proposed ones (`--proposal`).
 

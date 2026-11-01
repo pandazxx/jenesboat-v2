@@ -62,7 +62,7 @@ def test_escort_balance_relations_hold_at_every_level(name):
     assert 0 < dc.confirm_damage < dc.damage
     assert dc.pattern_cooldown >= dc.run_max_time
     assert ai.lose_track_time > sonar.ping_interval * 10
-    assert ai.datum_attack_age > 60.0 and ai.blind_attacks >= 1
+    assert ai.datum_attack_age > 60.0 and ai.blind_attacks >= 1 and ai.max_track_speed > 0
     assert ai.hunt_leash > ai.screen_distance and ai.max_hunt_time > ai.lose_track_time
     # The boat: deep is a resource that shrinks with damage; radar sees surfaced boats only.
     assert rules.submarine.overdepth_rate > 0

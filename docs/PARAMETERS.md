@@ -48,8 +48,10 @@ the game stays playable without time compression above x8.
 | fire max depth | 20 m | tubes can be fired at or above this depth |
 | battery | 1.5 h at full submerged speed, 20 h at creep, 3 h recharge surfaced | drain grows with the cube of the throttle (propeller power); empty battery = 15 % of submerged speed |
 | lookouts | 12 km (surfaced, day) | big merchant with smoke on a clear day |
-| periscope | 7 km | low eye height |
+| periscope | 7 km | low eye height; only with the scope raised |
 | hydrophone | 15 km, bearing only | needs depth >= 11 m and own speed <= 4 kn |
+| periscope raised / lowered | `V`, 5 s to raise (`scope_raise_time`) | lowered: nothing shows above the water (lookouts cannot see the boat at periscope depth) and the boat is blind, hydrophone only; going deep lowers it, coming back up does not raise it (#37) |
+| safe depth | `max_depth x (1 - damage)`; below it the hull loses `overdepth_rate` = 0.1 % per second for every 20 m of excess (cadet 0.05 %, veteran 0.15 %) | deep is a resource that shrinks with damage: a sound boat may sit at 150 m, a boat that has taken 40 % is safe to 90 m and groans below it (#37) |
 
 Speed limit by depth: full `max_speed` on the surface, `submerged_speed` once the hull is under
 (linear blend over the first 12 m), scaled by the battery rule.
@@ -84,10 +86,12 @@ freighter) is defined on the sheet for Milestone 2 and cannot be fired yet.
 | surfaced | 6,000 m |
 | periscope depth, <= 3 kn | 1,000 m |
 | periscope depth, faster | 1,000 m + 900 m per m/s above 3 kn (about 2,900 m at 7 kn) |
+| periscope depth, scope lowered | never |
 | deeper than 14 m | never |
 
 Multiply by the ship type's `lookout` (destroyer 1.5) and by the world's `light` (1.0 = day;
-night is a later milestone). A ship reacts only after the boat has stayed in range for
+night is a later milestone). An escort with **radar** (`RadarParams`, `veteran` only, 20 km)
+finds a *surfaced* boat at once and exactly, and the group treats it as a sighting. A ship reacts only after the boat has stayed in range for
 `spot_time` = 3 s; the timer runs down again when the boat drops out of range.
 
 ## Merchant AI (`MerchantAIParams`)
@@ -100,45 +104,69 @@ night is a later milestone). A ship reacts only after the boat has stayed in ran
 | escape range | 20 km | a merchant this far from the boat (or off the map) has got away, alerted or not: the hunt area |
 | panic range | 6 km | a torpedo hit alerts every merchant within this distance |
 
-## Destroyer escort (M2: `SonarParams`, `DepthChargeParams`, `EscortAIParams`)
+## Destroyer escort (`SonarParams`, `SeaParams`, `DepthChargeParams`, `EscortAIParams`)
 
 The scenario sends two destroyers (`SCENARIO.escorts`; one at `cadet`, three at `veteran`)
 with the three merchants; they start on their formation stations, 1.2 km ahead of the group
 and 1.5 km off either flank (a third and fourth escort take stations 3 km off the flanks).
 Lookouts use the ordinary detection table (`lookout` 1.5 makes a surfaced boat visible at
-9 km, a periscope at 1.5 km).
+9 km, a raised periscope at 1.5 km). The rules below are the hunt rework of #37 (design
+record: `docs/ESCAPE_BALANCE.md`, `docs/ESCAPE_STORIES.md`).
 
-**Active sonar** (`SONAR_ASDIC`). Each destroyer pings every 5 s. The echo range is 3,000 m
-multiplied by:
+**Active sonar** (`SONAR_ASDIC`). Each destroyer pings every 5 s. One ping has one *effective
+reach*, the range at which this ship can hold this boat right now:
+
+```
+R_eff = range x f_aspect x f_speed x f_layer x f_set        (0 behind a noise shadow)
+```
 
 | factor | value | why |
 | --- | --- | --- |
-| other ships within 2.5 km (the fleet itself) | -12 % each, never below 40 % | the convoy's screws and wakes mask the echo: this is the "interfered by the fleet" rule, so a boat lurking at the edge of the convoy is hard to find and one outside it is not |
-| destroyer faster than 15 kn | x 0.4 | its own screws deafen the set; hunters slow to 14 kn inside 1.5 km |
-| boat at or below 2.5 kn | x 0.7 | a creeping boat makes less noise |
+| `range` | 3,000 m (cadet 2,400, veteran 3,600) | a beam-on, moving boat above the layer, settled set |
+| `f_aspect` | `aspect_floor + (1 - aspect_floor) x abs(sin aspect)`, floor 0.4 (cadet 0.3, veteran 0.5) | a hull broadside returns far more sound than a bow; end-on to the pinger is the classic evasion |
+| `f_speed` | x 0.7 at or below 2.5 kn (`quiet_speed`, `quiet_factor`) | a creeping boat makes less noise |
+| `f_layer` | x 0.5 below the thermocline (cadet 0.4, veteran 0.6) | sound bends away at the temperature layer |
+| `f_set` | sprinting (over 15 kn) x 0.25; `settle_time` 20 s of nothing after slowing; rudder more than half over x 0.5 | the set hears nothing through its own screws and wake |
+| noise shadows | 0 behind a friendly ship (afloat, stopped or sunk: `noise_base` 150 m + `noise_per_knot` 30 m/kn of its speed, as a sector beyond it) or behind the **cloud** a pattern leaves (`cloud_radius` 150 m for `cloud_duration` 180 s; cadet 240, veteran 120) | the convoy's screws and the boiling water after the bursts mask the sea behind them: the boat can shelter in both |
 
-The echo is lost inside 150 m (the attacker runs over the boat on its last fix). A fix has a
-+-40 m error per axis. The boat's depth is not measured.
+The echo comes back only inside the **cone** the set can be trained over, `arc` = 70 deg either
+side of the bow (cadet 45, veteran 90; the rest is the baffles), and outside the **blind
+zone** under the keel, `depth_blind_ratio` 3 x the boat's depth (cadet 4, veteran 2.5),
+never less than `min_range` 150 m nor more than `blind_zone_cap` 300 m. Inside
+`sure_fraction` 0.4 of `R_eff` (veteran 0.5) the echo is sure; beyond it the chance falls
+to zero at `R_eff`. A fix is a random point in a ring of radius `area_base` 25 m +
+`area_span` 150 m x (d / `R_eff`): a faint echo is a poor fix (175 m at the edge of the
+reach, 75 m a third of the way in). The boat's depth is never measured. The HUD draws each
+destroyer's cone, the escorts' fix on the boat with its ring, and `ECHO <m>`, the settled
+reach of the nearest destroyer against the boat now.
 
-**Tracking.** Every sonar fix or sighting goes into a 45 s window; a least-squares line through
-it gives the escorts the boat's position now (the +-40 m noise of single fixes averages out)
-and its course and speed (needs three fixes over at least 10 s, capped at 7.6 kn). A torpedo hit
-gives a rough position and no course. The prediction is carried at most 90 s past the last fix.
+**The sea** (`SEA`). Each hunt draws a thermocline between `layer_min` 40 m and `layer_max`
+90 m (`layer_chance` 1.0; 0.7 at `veteran`, so some veteran hunts have none). The boat learns
+where it is by crossing it (`LAYER <m>` on the depth line of the HUD).
 
-**Depth charges** (`DEPTH_CHARGE`). Projectors throw a charge up to 150 m from the ship, so a
-destroyer does not have to cross the boat's path: a run starts as soon as the predicted
-position of the boat (10 s ahead, about how long the first charge takes to sink) is within
-150 m, and hunters steer for the predicted position rather than the last fix. A run is 6
-charges 1 s apart. Each is aimed where the boat will be when that charge has sunk to its depth
-(the predicted path), up to 15 m to either side of it, and set deeper than the one before, in
-layers from 25 m above to 25 m below the estimated depth (never shallower than 15 m).
-A charge whose aim point is beyond 150 m is not thrown. Charges sink at 3 m/s. A burst within
-12 m of the boat breaks it; out to 45 m it does up to 40 % hull damage, falling off linearly,
-in 3D (depth counts). Damage accumulates and is never repaired; the boat is lost at 100 %.
-45 s between runs; 40 charges per ship. Rough odds against a boat that holds a steady course or
-sits still for about 3 minutes after being found: half are lost when deep, all at periscope
-depth. Circling does not help (the prediction stays on the circle's area); what helps is
-leaving the area quietly and changing course, so the track is lost.
+**Tracking.** Every sonar fix, sighting or radar fix goes into a 45 s window; a least-squares
+line through it gives the escorts the boat's position now and its course and speed (needs
+three fixes over at least 10 s, capped at 7.6 kn). Bigger rings mean a worse track. A sighting
+or radar fix is exact and says the boat is shallow. An **observed torpedo** (heard within
+1,200 m, or its wake seen) gives the escorts its *track line*: the boat is somewhere along it
+within the torpedo's run (5,000 m), the hunter sweeps the line outward from the target at
+14 kn, and the line becomes a stale point to search around at its end. A torpedo does not
+overrule a fix younger than 30 s.
+
+**Depth charges** (`DEPTH_CHARGE`). Projectors throw a charge up to 150 m from the ship. A run
+starts as soon as the predicted position of the boat (10 s ahead) is within 150 m; it is 6
+charges 1 s apart, each aimed where the boat will be when that charge has sunk to its depth
+(the predicted path), up to 15 m to either side (`scatter`); a pattern on an assumed flight straddles the path instead, in steps out to `blind_scatter` 60 m either side, because the guess is worth less than a fix. The pattern is set in one **depth band**:
+15 to 40, 40 to 80 or 80 to 150 m (`bands`), the six charges spread over it. A sighting or
+a torpedo starts the escorts in the shallow band, a sonar-only alarm in the medium one; a
+pattern that does at least `confirm_damage` 10 % confirms its band, one that does less moves
+the next pattern to the following band (deep after medium, shallow after deep). Each charge is
+**released when the ship reaches its aim point**; if the aim points stay ahead and out of
+reach for `run_max_time` 90 s the run is abandoned (the run-over release, which ends the stern
+chase stalemate of #35). Charges sink at 3 m/s. A burst within 12 m of the boat breaks it; out
+to 45 m it does up to 40 % hull damage, falling off linearly, in 3D (depth counts). Damage
+accumulates and is never repaired; the boat is lost at 100 %. The rack reloads in
+`pattern_cooldown` 120 s (cadet 150, veteran 90); 40 charges per ship.
 
 **Torpedo evasion** (`TORPEDO_EVASION`, the `comb` strategy of the `escort_evade` slot, M3 /
 #22; `cadet` keeps `none`). An escort hears a running torpedo's screws within `hear_range` =
@@ -147,27 +175,30 @@ by day). If the torpedo's closest approach, with both holding course and speed, 
 `threat_width` = 150 m and comes before the torpedo runs out, the ship reacts after
 `reaction_time` = 5 s: it turns hard to the course that *combs the track*, parallel to the
 torpedo's course but `comb_angle` = 30° off it toward the side of the track the ship is
-already on (running with the torpedo or toward it, whichever is the smaller turn), at full
-speed, until the torpedo has gone by or run out, then carries on with what it was doing.
-A destroyer charging the boat at 20 kn and hearing a G7e at 1.2 km has about 45 s: enough
-to open 100 m or more, and a 10 m beam needs only 7. Fired from inside about 500 m, or at a
-ship that does not hear it in time, a torpedo still hits.
+already on, at full speed, until the torpedo has gone by or run out, then carries on with what
+it was doing. Fired from inside about 500 m, or at a ship that does not hear it in time, a
+torpedo still hits.
 
-**Escort AI** (`ESCORT_AI`, code in `sim/escort.py`):
+**Escort AI** (`ESCORT_AI`, code in `sim/escort.py`). The hunt is a cycle:
 
 | state | behaviour |
 | --- | --- |
 | evading | (any state, `escort_evade = comb`) a torpedo that will pass too close is heard: comb its track at full speed until it has gone by, then resume |
-| formation | hold the station relative to the merchants' centre and route, at the convoy's speed |
-| alarm | a sonar fix, a lookout sighting or a torpedo hit sets the group's *datum* (where the boat is). The convoy is told (merchants within 8 km run) |
+| formation | hold the station relative to the merchants' centre and route, at the convoy's speed (intent `formation`, or `returning` while getting back to it) |
+| alarm | a sonar fix, a sighting, a radar fix or an observed torpedo sets the group's *datum*. The convoy is told (merchants within 8 km run) |
 | split | the escorts nearest the datum hunt (`hunters_per_escort` = 1 hunter per 3 escorts, 1 to 2); the rest screen. A lost hunter is replaced from the screens |
-| hunt | steer for the predicted position of the boat, 20 kn, slow to 14 kn inside 1.5 km, throw a pattern from up to 150 m away. Without a fix younger than 60 s run the `escort_search` strategy: `box` sweeps a square around the datum that widens by 1 m/s (400 m to 2.5 km) |
+| hunting | steer for the predicted position of the boat, 20 kn, slow to 14 kn inside 1.5 km, throw a pattern from up to 150 m away while the fix is under 60 s old (`attacking` during a run) |
+| datum attack | a fix older than 60 s but younger than `datum_attack_age` 180 s (cadet 120, veteran 240) is still attacked once, at the dead-reckoned position |
+| blind lead | when that finds nothing, the hunter assumes the boat has run straight away from the ship that found it, from the last fix, at the type's best submerged speed (`max_track_speed`, 7.6 kn) ever since, and attacks that assumed track `blind_attacks` times (2; cadet 1, veteran 3), on a fresh rack each time. A boat that runs straight is where the assumption says; a boat that turned or slowed is not |
+| sweeping | with a torpedo line as the datum: down the track from the target outward at 14 kn, pinging both sides |
+| searching | the `escort_search` strategy: `sweep` runs legs *through* the datum from alternating directions so the cone covers the whole area, which widens by 1 m/s (400 m to 2.5 km); `box` (the M2 square) is kept for tests |
 | screen | stand 2 km from the convoy centre toward the datum, 700 m apart, facing the threat |
-| stand down | no fix or sighting for 300 s: everyone returns to formation |
-| merchants | an alerted merchant that is nearer the threat than the nearest non-hunting escort slips in behind it (the point 700 m behind it, never steering more than 90° from directly away from the boat); one already behind the escort keeps running away. With no escort it just runs away (M1 rule) |
+| stand down | the hunt ends (`escort_stand_down` with a reason, in the log): `lost`, no echo for `lose_track_time` (300 s; cadet 180, veteran 480) counted from when the hunter started searching; `leash`, a hunter more than `hunt_leash` 10 km (cadet 6, veteran 15) from where the convoy centre was when the alarm was raised; `time`, `max_hunt_time` 30 min after the alarm (cadet 15, veteran 60); `charges`, every hunter's rack empty. Everyone returns to formation |
+| merchants | an alerted merchant that is nearer the threat than the nearest non-hunting escort slips in behind it; one already behind the escort keeps running away. With no escort it just runs away (M1 rule) |
 
-A torpedo hit gives only a rough datum (2 km back along the torpedo's track) and never replaces
-a fix younger than 30 s.
+The log says when a hunter loses the echo and why (`under the keel`, `outside the cone`,
+`behind merchant-2`, `behind the cloud`, `faint echo missed`, `out of reach`), what band each
+pattern is set to, when the hunter assumes a flight, and why the escorts broke off.
 
 **Scoring.** Only merchants count for the hunt (`SUNK ... GRT`, the end banner, mission end).
 Sinking a destroyer (1 torpedo, 1,800 GRT) adds to the separate escort bonus shown as
@@ -183,15 +214,29 @@ same at every level except for the torpedo reload time, so the difficulty is in 
 
 | block . value | `cadet` | `patrol` | `veteran` | why |
 | --- | --- | --- | --- | --- |
-| `scenario.escorts` | 1 | 2 | 3 | the number of sonar sets and depth charge racks in the water, and how tight the screen is |
-| `sonar.range` | 2,400 m | 3,000 m | 3,600 m | how far from the convoy's edge a submerged boat is safe; the fleet-noise and own-speed factors apply on top |
-| `escort_ai.lose_track_time` | 180 s | 300 s | 480 s | how long escorts keep sweeping after the last fix before they go back to the convoy: the "wait it out deep" tactic gets cheaper or dearer |
+| `scenario.escorts` | 1 | 2 | 3 | the number of sonar sets and depth charge racks in the water, and how tight the screen is; cones cover each other's blind arcs |
+| `sonar.range` | 2,400 m | 3,000 m | 3,600 m | how far from the convoy's edge a submerged boat is safe; the aspect, speed, layer and set factors apply on top |
+| `sonar.arc` | 45 deg | 70 deg | 90 deg | how much of the sea a set listens to: the narrower, the more water the boat can hide in abeam |
+| `sonar.depth_blind_ratio` | 4 | 3 | 2.5 | how far out a deep boat is lost under the keel (capped at 300 m) |
+| `sonar.aspect_floor` | 0.3 | 0.4 | 0.5 | what an end-on boat is worth: the veteran's "turn the stern to it" buys more at `cadet` |
+| `sonar.layer_factor` | 0.4 | 0.5 | 0.6 | how much the thermocline hides |
+| `sonar.sure_fraction` | 0.4 | 0.4 | 0.5 | how far out an echo is sure |
+| `sonar.cloud_duration` | 240 s | 180 s | 120 s | how long a pattern's cloud hides the boat |
+| `sea.layer_chance` | 1.0 | 1.0 | 0.7 | some veteran hunts have no layer |
+| `radar.range` | none | none | 20 km | a surfaced boat is found far beyond the lookouts at `veteran` |
+| `depth_charge.pattern_cooldown` | 150 s | 120 s | 90 s | the rack reload between runs |
 | `depth_charge.damage` | 0.3 | 0.4 | 0.5 | hull damage at the edge of the damage radius: 4, 3 or 2 near bursts to lose the boat |
 | `depth_charge.lethal_radius` | 12 m | 12 m | 15 m | veteran patterns are deadly a little further out |
-| `torpedo.reload_time` | 90 s | 120 s | 150 s | the only change to the boat: how soon a second salvo is ready |
+| `escort_ai.datum_attack_age` | 120 s | 180 s | 240 s | how stale a fix the hunter still attacks |
+| `escort_ai.blind_attacks` | 1 | 2 | 3 | how many attacks on the assumed straight flight |
+| `escort_ai.lose_track_time` | 180 s | 300 s | 480 s | how long the search goes on without an echo |
+| `escort_ai.hunt_leash` | 6 km | 10 km | 15 km | how far from the convoy a hunter will follow |
+| `escort_ai.max_hunt_time` | 15 min | 30 min | 60 min | how long the escorts hunt at most |
+| `submarine.overdepth_rate` | 0.05 %/s | 0.1 %/s | 0.15 %/s | per 20 m below the safe depth |
+| `torpedo.reload_time` | 90 s | 120 s | 150 s | how soon a second salvo is ready |
 | `torpedo_hit.glance_chance` | 1.0 | 0.5 | 0.25 | whether a bow-on or stern-on shot (under 30° off the axis) detonates: every hit counts at cadet |
 | `escort_evade` strategy | `none` | `comb` | `comb` | cadet destroyers never notice a torpedo; the others comb its track (#22) |
-| other strategies | `box`, `zigzag` | same | same | one search and one flee behaviour so far |
+| other strategies | `sweep`, `zigzag` | same | same | one search and one flee behaviour so far |
 
 `tests/test_params.py::test_escort_balance_relations_hold_at_every_level` runs the balance
 relations against each level's rules, and `tests/test_difficulty.py` pins the ordering of the

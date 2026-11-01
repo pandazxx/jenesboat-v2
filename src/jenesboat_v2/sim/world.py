@@ -123,6 +123,9 @@ class World:
     _known: dict[str, str] = field(default_factory=dict)  # ship id -> contact method
     datum: Datum | None = None  # where the escorts think the boat is
     hunt_since: float | None = None  # s, when the escorts' alarm was raised (the hunt's clock)
+    hunt_from: tuple[float, float] | None = (
+        None  # the convoy centre at the alarm (the leash's post)
+    )
     observed_torpedoes: set[int] = field(default_factory=set)  # torpedoes the escorts have heard
     depth_charges: list[DepthCharge] = field(default_factory=list)
     next_charge_id: int = 0

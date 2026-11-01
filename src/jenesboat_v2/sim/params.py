@@ -167,6 +167,7 @@ class DepthChargeParams:
     drop_interval: float  # s between charges in a pattern
     throw_range: float  # m, projectors throw a charge up to this far from the ship
     scatter: float  # m, each charge lands up to this far either side of the predicted path
+    blind_scatter: float  # m, a pattern on an assumed flight straddles the path out to this far
     pattern_cooldown: float  # s before the same ship starts another run (the rack reload)
     run_max_time: float  # s, a run whose aim points the ship cannot reach is abandoned
     magazine: int  # charges carried per destroyer
@@ -199,7 +200,9 @@ class EscortAIParams:
     max_hunters: int
     track_window: float  # s of sonar fixes used to estimate the boat's course and speed
     track_min_baseline: float  # s, fixes closer in time than this give no course estimate
-    max_track_speed: float  # m/s, a faster estimate is noise (the boat's best submerged speed)
+    max_track_speed: (
+        float  # m/s, the boat's best submerged speed: caps the track, drives the blind lead
+    )
     lead_limit: float  # s, the prediction is never carried further than this past the last fix
     lose_track_time: (
         float  # s without a fix, counted from the hunter's arrival, before standing down
@@ -207,7 +210,6 @@ class EscortAIParams:
     datum_attack_age: (
         float  # s, a hunter still attacks the dead-reckoned position with a fix this old
     )
-    blind_lead_speed: float  # m/s, the straight flight assumed after a datum attack finds nothing
     blind_attacks: int  # how many attacks on the assumed flight before the hunter gives it up
     hunt_leash: float  # m from the convoy centre a hunter will not follow the boat beyond
     max_hunt_time: float  # s after the alarm the escorts give the hunt up
@@ -418,6 +420,7 @@ DEPTH_CHARGE = DepthChargeParams(
     drop_interval=1.0,
     throw_range=150.0,
     scatter=15.0,
+    blind_scatter=60.0,
     pattern_cooldown=120.0,
     run_max_time=90.0,
     magazine=40,
@@ -452,7 +455,6 @@ ESCORT_AI = EscortAIParams(
     lead_limit=90.0,
     lose_track_time=300.0,
     datum_attack_age=180.0,
-    blind_lead_speed=7.0 * KNOT,
     blind_attacks=2,
     hunt_leash=10_000.0,
     max_hunt_time=1_800.0,
