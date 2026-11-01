@@ -3,8 +3,8 @@
 Status: brainstorm and proposal, 2026-10-24; detection section reworked to the owner's
 direction on 2026-10-25 (section 3.1); after the owner's review of the second-prototype
 stories the brainstorm went back to mental models (section 7) and, on 2026-11-01, to the
-player archetypes (section 8) and the owner's answers of 2026-11-01 (sections 9 and 10), which is
-where it stands. Issue #34 holds the record up to
+player archetypes (section 8) and the owner's answers of 2026-11-01 (sections 9 and 10) and the
+archetype stories (section 11, `docs/ESCAPE_STORIES.md`), which is where it stands. Issue #34 holds the record up to
 that point and is closed; the discussion continues on #37. Requirement issue #37 (decisions go there; #34 is the closed record), bug
 #35 (the stern chase stalemate found on the way). Nothing in this page is implemented yet;
 the numbers come from `scripts/escape_study.py`, a headless harness that plays a found boat
@@ -481,6 +481,15 @@ sprinting set a quarter of each.
 - **Unchanged**: the area rule, merchant shadows, baffles, blind zone, sprint deafness, radar,
   torpedo line, one-indicator HUD rule; model 1 only replaces the fixed `range` in them with
   `R_eff`. Depth bands and the cost of depth stay recommended.
+
+## 11. Archetype stories (2026-11-01)
+
+The five archetype stories, imagined by hand from the agreed rules as the specification for
+the study and the sim, are in `docs/ESCAPE_STORIES.md`: a top-notch torpedo lure, a veteran
+escape and follow-back, an average 50 / 50, a reckless loss, and a panic flight that, written
+straight from the rules, *escapes*, which exposes two missing escort rules (the datum attack and
+the blind lead) and a blind zone cap. The file ends with the rules the stories needed and the
+numbers they put a finger on.
 
 ## Appendix: the study
 
