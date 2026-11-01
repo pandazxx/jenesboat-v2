@@ -3,7 +3,7 @@
 Status: brainstorm and proposal, 2026-10-24; detection section reworked to the owner's
 direction on 2026-10-25 (section 3.1); after the owner's review of the second-prototype
 stories the brainstorm went back to mental models (section 7) and, on 2026-11-01, to the
-player archetypes (section 8) and the owner's answers of 2026-11-01 (section 9), which is
+player archetypes (section 8) and the owner's answers of 2026-11-01 (sections 9 and 10), which is
 where it stands. Issue #34 holds the record up to
 that point and is closed; the discussion continues on #37. Requirement issue #37 (decisions go there; #34 is the closed record), bug
 #35 (the stern chase stalemate found on the way). Nothing in this page is implemented yet;
@@ -333,7 +333,7 @@ The historical boats that got away did so because the escort *lost the echo*: a 
 
 #### Mental models
 
-**1. Contact is a quality, not a range.** *Dropped by the owner on 2026-11-01 (#37): no aspect, no thermocline, no stealth gauge; the detection rules stay as decided in section 3.1 and the silent escape comes from geometry and timing, see section 9.* The echo the hunter gets back is a number, *echo strength*, and the fix exists only while it is above the set's threshold. Echo strength falls with range, and is multiplied by what the boat is doing:
+**1. Contact is a quality, not a range.** *Dropped by the owner on 2026-11-01 (#37), then reinstated the same day; section 10 gives it as one score per ping (effective reach) that sets discovery, the ring and the search.* The echo the hunter gets back is a number, *echo strength*, and the fix exists only while it is above the set's threshold. Echo strength falls with range, and is multiplied by what the boat is doing:
 
 | factor | strong echo | weak echo | why |
 | --- | --- | --- | --- |
@@ -420,8 +420,9 @@ shadow the boat may ride at periscope depth or deep only.
 
 ## 9. Answers of 2026-11-01 (#37) and what is left for a silent escape
 
-- **Model 1 dropped.** The boat cannot make its echo weaker. It can only not be where the ping
-  goes, or be behind something.
+- **Model 1 dropped**, then reinstated later the same day (section 10). The rest of this
+  section was written while it was dropped; the tools listed below stay valid, with aspect and
+  the layer added back.
 - **Why "a straight flank run is the safest recipe and 150 m is free" had to change.** Both
   make the *panic* archetype succeed under today's rules: the stern chase stalemate (#35,
   section 1) is never hit and never ends; and depth costs nothing while it helps twice (the
@@ -445,6 +446,41 @@ shadow the boat may ride at periscope depth or deep only.
   window; the archetype stories must settle them.
 - **Next:** the five archetype stories as imagined tables from these tools only, same opening
   at `patrol` (periscope sighted at 1.5 km, day), top-notch from a torpedo lure.
+
+## 10. Model 1 as one score per ping (2026-11-01, #37)
+
+For each ping from one destroyer to the boat:
+
+```
+R_eff = range x f_aspect x f_speed x f_layer x f_set        (0 in a noise shadow)
+```
+
+| factor | reads | sketch |
+| --- | --- | --- |
+| `f_aspect` | angle between the boat's heading and the bearing to the pinger (90 = beam) | `0.4 + 0.6 x |sin(aspect)|`: beam 1.0, end-on 0.4 |
+| `f_speed` | the creep bonus on the sheet | <= 2.5 kn 0.7, else 1.0 |
+| `f_layer` | the boat below the hunt's thermocline (drawn per hunt, 40 to 90 m) | 0.5 below, 1.0 above |
+| `f_set` | the pinging ship's state | settled 1.0, hard turn 0.5, sprinting 0.25, settling 0 |
+
+`R_eff` is the range at which this destroyer can hold this boat now. At `patrol`: beam-on,
+moving, above the layer, settled set 3,000 m; end-on creeping below the layer 420 m; against a
+sprinting set a quarter of each.
+
+- **Discovery**: an echo comes back if the boat is outside the blind zone and the baffles and
+  inside `R_eff`, with the faint-echo chance (sure inside 40 % of `R_eff`, zero at `R_eff`).
+- **Precision**: `ring = area_base + area_span x (d / R_eff)` (sketch 25 m + 150 m x d/R_eff),
+  which is the owner's area rule when `R_eff` = `range`. A faint echo is a poor fix; the ring on
+  the HUD grows as the boat turns end-on or slows. One number, `ECHO <m>` (the settled reach
+  against the boat now), lets the player read an order's effect before the next ping.
+- **Search**: the fixes feed the same least-squares track as today, so bigger rings mean a
+  worse course estimate and aim point; after the blind window the hunter re-acquires only if
+  the boat is within `R_eff` for its *current* state from the hunter's *current* position (420 m
+  against a 400 m box around a prediction 100 to 200 m wrong); the box search and
+  `lose_track_time` then decide `track lost`. Each escort pings with its own `R_eff` (its own
+  aspect and state), so more sets at `veteran` bite through geometry.
+- **Unchanged**: the area rule, merchant shadows, baffles, blind zone, sprint deafness, radar,
+  torpedo line, one-indicator HUD rule; model 1 only replaces the fixed `range` in them with
+  `R_eff`. Depth bands and the cost of depth stay recommended.
 
 ## Appendix: the study
 
