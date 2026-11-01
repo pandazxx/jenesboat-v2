@@ -1,0 +1,13 @@
+{
+  "built_at": "2026-11-01T09:10:56+00:00",
+  "cdn": "https://pygame-web.github.io/archives/0.9/",
+  "kind": "pr",
+  "name": "a855c1a",
+  "pr": 38,
+  "pybuild": "3.12",
+  "ref": "topic/37-silent-escape",
+  "run_url": "https://github.com/pandazxx/jenesboat-v2/actions/runs/41291879267",
+  "sha": "a855c1ad34ce2366007d1e079dccbf68bb6f18b2",
+  "title": "Silent escape: the hunt rework (sonar score, cone, shadows, depth bands, blind lead, scope, safe depth, HUD, battle log)",
+  "url": "https://pandazxx.github.io/jenesboat-v2/builds/a855c1a/"
+}
