@@ -28,7 +28,7 @@ import argparse
 import math
 import random
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from jenesboat_v2.sim import escort as E
 from jenesboat_v2.sim import params as P
@@ -180,6 +180,7 @@ def run(
 @dataclass(frozen=True)
 class Proposal:
     baffle_angle: float = 50.0  # deg either side of the stern the set cannot hear
+    sonar_arc: float = 180.0  # deg either side of the bow the set can be trained (180 = all round)
     depth_blind_ratio: float = 3.0  # echo lost inside depth * ratio (the beam cannot tilt down)
     sure_fraction: float = 0.4  # a ping inside this fraction of the reach is a sure fix (kept, Q1)
     area_base: float = 25.0  # m, radius of the fix's uncertainty area at zero range (Q2)
@@ -256,6 +257,8 @@ def _ping(world: World, ship, state) -> None:
         why = f"out of reach ({reach:.0f} m{', sprinting' if sprinting else ''})"
     elif abs(angle_diff(brg, ship.heading)) > 180.0 - PROP.baffle_angle:
         why = "boat in the baffles astern"
+    elif abs(angle_diff(brg, ship.heading)) > PROP.sonar_arc:
+        why = f"boat outside the sonar arc (+-{PROP.sonar_arc:.0f} deg)"
     elif shadow is not None:
         why = f"boat behind {shadow}'s noise"
     elif world.rng.random() > chance:
@@ -658,6 +661,12 @@ def main() -> None:
     ap.add_argument("--ranges", default=",".join(str(r) for r in RANGES))
     ap.add_argument("--proposal", action="store_true", help="measure the proposed rules")
     ap.add_argument(
+        "--arc",
+        type=float,
+        default=None,
+        help="proposal: train the sonar only within this many degrees of the bow (what-if)",
+    )
+    ap.add_argument(
         "--story",
         default=None,
         metavar="RECIPE",
@@ -678,6 +687,9 @@ def main() -> None:
     for name in names:
         if args.proposal:
             install(name)
+            if args.arc is not None:
+                global PROP
+                PROP = replace(PROP, sonar_arc=args.arc)
         try:
             if args.story:
                 print(render_story(args.story, ranges, args.seeds, P.DIFFICULTIES[name]))
