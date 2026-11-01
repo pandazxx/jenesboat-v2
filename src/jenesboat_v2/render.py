@@ -14,6 +14,7 @@ from pathlib import Path
 from jenesboat_v2._build_info import BUILD_ID
 from jenesboat_v2.game import Game
 from jenesboat_v2.sim.detection import HYDROPHONE, ship_detection_range
+from jenesboat_v2.sim.escort import LINE
 from jenesboat_v2.sim.geo import angle_on_bow, bearing, project
 from jenesboat_v2.sim.scenario import INTEL_POSITION_ERROR
 
@@ -42,6 +43,11 @@ AIM = (200, 180, 90, 160)
 LEAD_OK = (120, 240, 120, 255)
 LEAD_BAD = (240, 150, 90, 255)
 BUBBLE = (200, 90, 90, 110)
+FIX = (255, 150, 110, 255)  # the escorts' fix on us: where they think we are
+FIX_RING = (255, 150, 110, 120)
+CONE = (255, 120, 90, 70)  # a destroyer's sonar cone
+CLOUD = (120, 140, 170, 60)  # disturbed water after a pattern: a noise shadow
+LINE_DATUM = (255, 150, 110, 160)  # the torpedo track the escorts are sweeping
 HUD = (230, 230, 230, 255)
 HUD_DIM = (150, 160, 170, 255)
 ALERT = (255, 120, 90, 255)
@@ -51,7 +57,7 @@ TRACK_LENGTH = 12_000.0  # m of projected track drawn ahead of the target
 STATUS_TOP = 8  # the status column: one attribute per line, down the left edge
 STATUS_LINE = 17
 STATUS_SIZE = 16
-STATUS_LINES = 11
+STATUS_LINES = 13
 HUD_TOP = 34  # px reserved for the HUD text at the top
 PANEL_BOTTOM = 150  # px, below the contact panel on the right
 EDGE_MARGIN = 28  # px, where off-screen cue arrows sit
@@ -134,6 +140,10 @@ def draw(rl, game: Game, width: int, height: int, pad: Pad | None = None) -> Non
     _draw_own_track(rl, cam, world.player_track, sub.x, sub.y)
     _draw_cue(rl, cam, world.cue())
 
+    for cloud in world.clouds:
+        cx, cy = cam.to_screen(cloud.x, cloud.y)
+        _draw_blur(rl, cx, cy, max(6.0, cam.px(cloud.radius)), CLOUD)
+    _draw_fix(rl, cam, world)
     for ship in world.ships:
         if ship.sunk:
             _draw_wreck(rl, cam, ship.x, ship.y)
@@ -148,6 +158,8 @@ def draw(rl, game: Game, width: int, height: int, pad: Pad | None = None) -> Non
             color = HULL_SONAR
         else:
             color = HULL_MILITARY if ship.kind == "military" else HULL_MERCHANT
+        if ship.kind == "military":
+            _draw_cone(rl, cam, ship, world.rules.sonar)
         selected = target is not None and contact.ship_id == target.ship_id
         _draw_dashed(
             rl, cam, ship.x, ship.y, ship.heading, TRACK_LENGTH, TRACK if selected else TRACK_DIM
@@ -336,6 +348,46 @@ def _draw_fire_control(rl, cam: Camera, game: Game) -> None:
     rl.draw_line_ex(rl.Vector2(cx, cy), rl.Vector2(tx, ty), 1.0, _color(rl, color))
 
 
+def _draw_fix(rl, cam: Camera, world) -> None:
+    """What the escorts know: their fix on the boat (a dot where they think it is and a ring
+    for how sure they are, fading as it ages) or the torpedo track they are sweeping.  One
+    indicator: an exact fix has no ring."""
+    datum = world.datum
+    if datum is None:
+        return
+    if datum.kind == LINE:
+        ax, ay = cam.to_screen(datum.x, datum.y)
+        ex, ey = cam.to_screen(*datum.line_point(datum.length))
+        rl.draw_line_ex(rl.Vector2(ax, ay), rl.Vector2(ex, ey), 1.0, _color(rl, LINE_DATUM))
+        return
+    age = world.time - datum.t
+    fade = max(0.25, 1.0 - age / 300.0)
+    dot = (FIX[0], FIX[1], FIX[2], int(FIX[3] * fade))
+    ring = (FIX_RING[0], FIX_RING[1], FIX_RING[2], int(FIX_RING[3] * fade))
+    px, py = datum.predict(world.time)
+    sx, sy = cam.to_screen(px, py)
+    rl.draw_circle_v(rl.Vector2(sx, sy), 3.0, _color(rl, dot))
+    if datum.ring > 0:
+        rl.draw_circle_lines(int(sx), int(sy), max(4.0, cam.px(datum.ring)), _color(rl, ring))
+
+
+def _draw_cone(rl, cam: Camera, ship, sonar) -> None:
+    """The arc a destroyer's sonar can be trained over, out to the sheet's range."""
+    sx, sy = cam.to_screen(ship.x, ship.y)
+    for edge in (-sonar.arc, sonar.arc):
+        ex, ey = project(ship.x, ship.y, ship.heading + edge, sonar.range)
+        sex, sey = cam.to_screen(ex, ey)
+        rl.draw_line_ex(rl.Vector2(sx, sy), rl.Vector2(sex, sey), 1.0, _color(rl, CONE))
+    steps = max(4, int(sonar.arc / 10))
+    prev = None
+    for i in range(steps + 1):
+        angle = ship.heading - sonar.arc + 2 * sonar.arc * i / steps
+        ex, ey = cam.to_screen(*project(ship.x, ship.y, angle, sonar.range))
+        if prev is not None:
+            rl.draw_line_ex(rl.Vector2(*prev), rl.Vector2(ex, ey), 1.0, _color(rl, CONE))
+        prev = (ex, ey)
+
+
 def _draw_sub(rl, cam: Camera, game: Game) -> None:
     sub = game.world.player
     sx, sy = cam.to_screen(sub.x, sub.y)
@@ -364,17 +416,30 @@ def _draw_hud(rl, game: Game, width: int, height: int, pad: Pad | None) -> None:
     mission = world.mission()
     reload = f" r{tubes.params.reload_time - tubes.reload_timer:.0f}s" if tubes.reloading else ""
     hull = f"HULL {100 - sub.damage * 100:.0f}%" if sub.damage > 0 else "HULL OK"
+    if sub.damage > 0:
+        hull += f"  SAFE {sub.safe_depth:.0f} m"
+    scope = (
+        "UP"
+        if sub.scope_up
+        else ("RISING" if sub.scope_wanted and sub.at_periscope_depth else "DOWN")
+    )
+    depth = f"DEPTH {sub.depth:.0f}>{sub.target_depth:.0f} m"
+    if world.layer_known and world.layer_depth is not None:
+        depth += f"  LAYER {world.layer_depth:.0f}"
+    echo = world.echo_reach()
     status = [
         f"HDG {sub.heading:03.0f}",
         f"SPD {sub.speed_knots:.1f} kn",
         sub.telegraph_label,
         sub.rudder_label,
-        f"DEPTH {sub.depth:.0f}>{sub.target_depth:.0f} m",
+        depth,
+        f"SCOPE {scope}" if not sub.surfaced else "SURFACED",
         f"BATT {sub.battery * 100:.0f}%",
         f"TUBES {tubes.loaded}/{tubes.params.tubes}+{tubes.reserves}{reload}",
         f"SUNK {len(mission['sunk'])}/{mission['total']}",
         f"{world.tonnage + world.bonus:,} GRT",
         hull,
+        f"ECHO {echo:.0f} m" if echo > 0 and not sub.surfaced else "ECHO -",
         "PAUSED" if game.paused else f"TIME x{game.time_scale}",
     ]
     x = 10 + int(pad.inset_left if pad else 0)
@@ -458,12 +523,16 @@ LEGEND = (
     ("dot", TORPEDO, "torpedo running"),
     ("box", HULL_MILITARY, "destroyer: sonar, depth charges (sink one for a bonus)"),
     ("dot", DEPTH_CHARGE, "depth charge sinking"),
+    ("blur", CLOUD, "disturbed water after a pattern: sonar is deaf through it"),
+    ("ring", FIX_RING, "where the escorts think you are (dot: their fix, ring: how sure)"),
+    ("line", LINE_DATUM, "torpedo track the escorts are sweeping"),
+    ("line", CONE, "a destroyer's sonar cone"),
     ("blur", CUE, "intel / last seen (arrow when off screen)"),
 )
 # Keyboard help, shown under the symbols (touch screens have buttons instead).
 LEGEND_KEYS = (
     "W/S telegraph   A/D rudder   Q midships",
-    "SPACE dive   C deep   F fire   T next target",
+    "SPACE dive   C deep   V scope   F fire   T next target",
     "-/= zoom   1-6 time   P pause   L legend",
 )
 LEGEND_WIDTH = 420  # fits the longest row at 14 px
@@ -537,6 +606,9 @@ def _draw_contact_panel(rl, game: Game, width: int) -> None:
         )
         if ship.alerted(world.time):
             lines.append(("RUNNING", ALERT))
+        if ship.kind == "military":
+            echo = "echo on us" if ship.escort.echo else "no echo"
+            lines.append((f"{ship.escort.intent.upper()}  {echo}", ALERT))
         sol = game.solution()
         if sonar:
             lines.append(("sonar estimate: periscope needed to shoot", HUD_DIM))

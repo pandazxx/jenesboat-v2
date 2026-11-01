@@ -38,6 +38,7 @@ KEYBOARD = {
     "Q": "KEY_Q",
     "SPACE": "KEY_SPACE",
     "C": "KEY_C",
+    "V": "KEY_V",
     "F": "KEY_F",
     "T": "KEY_T",
     "MINUS": "KEY_MINUS",
@@ -54,7 +55,7 @@ KEYBOARD = {
     "Y": "KEY_Y",
     "N": "KEY_N",
 }
-LOGGED = ("W", "S", "Q", "P", "T", "SPACE", "C", "F", "R", "TIME")  # keys that emit an input event
+LOGGED = ("W", "S", "Q", "P", "T", "SPACE", "C", "V", "F", "R", "TIME")  # keys that log an input
 
 
 def logical_size(css_width: float, css_height: float) -> tuple[int, int]:
@@ -179,6 +180,7 @@ def controls_from_keys(pressed: set[str], held: set[str], time_scale: int) -> Co
         rudder_center="Q" in pressed,
         dive_toggle="SPACE" in pressed,
         deep="C" in pressed,
+        scope="V" in pressed,
         fire="F" in pressed,
         zoom_in="EQUAL" in pressed,
         zoom_out="MINUS" in pressed,

@@ -324,8 +324,9 @@ config = {
         #pad-attack {
             right: max(10px, env(safe-area-inset-right));
             bottom: max(10px, env(safe-area-inset-bottom));
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(3, 1fr);
         }
+        #pad-attack #jb-log { font-size: 12px; opacity: 0.8; }
         #pad-meta {
             /* top edge, just right of the status column the game draws down the left edge */
             left: calc(max(10px, env(safe-area-inset-left)) + 130px);
@@ -447,8 +448,10 @@ height="1px"
         <div class="cluster" id="pad-attack">
             <button data-key="SPACE">DIVE</button>
             <button data-key="C">DEEP</button>
+            <button data-key="V">SCOPE</button>
             <button data-key="F">FIRE</button>
             <button data-key="T">TGT</button>
+            <button id="jb-log" title="download the battle log">LOG</button>
         </div>
         <div class="cluster" id="pad-meta">
             <button data-key="P" id="jb-pause">PAUSE</button>
@@ -584,7 +587,7 @@ frameborder="1"
     // when it wants the canvas buffer resized.  jb_difficulty: the ?difficulty=<name> of the
     // page URL (cadet, patrol or veteran), which the game reads once at the start.
     (function () {
-        const JB_KEYS = ["W", "S", "A", "D", "Q", "SPACE", "C", "F", "T", "MINUS", "EQUAL",
+        const JB_KEYS = ["W", "S", "A", "D", "Q", "SPACE", "C", "V", "F", "T", "MINUS", "EQUAL",
                          "P", "L", "R", "Y", "N", "TIME"];
         const HOLD = new Set(["A", "D"]);
         const bit = {};
@@ -600,6 +603,30 @@ frameborder="1"
         window.jb_pad_left = 0;
         window.jb_pad_right = 0;
         window.jb_ack = function () { window.jb_taps = 0; };
+        // The battle log: the game hands every event line to jb_log; LOG downloads them all
+        // as JSON lines (one object per line, the JENESBOAT prefix stripped).
+        const jbLines = [];
+        window.jb_log = function (line) {
+            const i = line.indexOf("JENESBOAT ");
+            jbLines.push(i >= 0 ? line.slice(i + 10) : line);
+            return true;
+        };
+        window.jb_download_log = function () {
+            const blob = new Blob([jbLines.join("\n") + "\n"], { type: "application/x-ndjson" });
+            const a = document.createElement("a");
+            const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+            a.href = URL.createObjectURL(blob);
+            a.download = "jenesboat-battle-log-" + stamp + ".jsonl";
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+            return jbLines.length;
+        };
+        const logButton = document.getElementById("jb-log");
+        if (logButton) {
+            logButton.addEventListener("pointerup", (e) => { e.preventDefault(); window.jb_download_log(); });
+            logButton.addEventListener("contextmenu", (e) => e.preventDefault());
+        }
         // The game asks for a GL buffer of CSS size x devicePixelRatio, so text is sharp on
         // a phone (the runtime leaves the buffer at the CSS size).
         window.jb_fit = function (w, h) {

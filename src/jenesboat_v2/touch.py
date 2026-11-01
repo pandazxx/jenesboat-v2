@@ -27,6 +27,7 @@ KEYS = (
     "Q",
     "SPACE",
     "C",
+    "V",
     "F",
     "T",
     "MINUS",
