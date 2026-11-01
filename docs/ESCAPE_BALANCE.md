@@ -458,7 +458,7 @@ R_eff = range x f_aspect x f_speed x f_layer x f_set        (0 in a noise shadow
 
 | factor | reads | sketch |
 | --- | --- | --- |
-| `f_aspect` | angle between the boat's heading and the bearing to the pinger (90 = beam) | `0.4 + 0.6 x |sin(aspect)|`: beam 1.0, end-on 0.4 |
+| `f_aspect` | angle between the boat's heading and the bearing to the pinger (90 = beam) | `0.4 + 0.6 x abs(sin(aspect))`: beam 1.0, end-on 0.4 |
 | `f_speed` | the creep bonus on the sheet | <= 2.5 kn 0.7, else 1.0 |
 | `f_layer` | the boat below the hunt's thermocline (drawn per hunt, 40 to 90 m) | 0.5 below, 1.0 above |
 | `f_set` | the pinging ship's state | settled 1.0, hard turn 0.5, sprinting 0.25, settling 0 |
@@ -539,7 +539,7 @@ marks: **decided** (owner, #34 / #37), **proposed** (in this note, not yet agree
 | sonar `depth_blind_ratio`, `blind_zone_cap`, `min_range` | echo lost inside `depth x ratio`, capped, floored | 4, 300, 150 | 3, 300, 150 | 2.5, 300, 150 m | decided / cap proposed |
 | sonar `own_noise_speed`, `own_noise_factor`, `settle_time`, `turn_factor` | the set's state: sprinting, settling, hard turn | 15 kn, 0.25, 20 s, 0.5 | same | same | decided / proposed |
 | sonar `quiet_speed`, `quiet_factor` | `f_speed` | 2.5 kn, 0.7 | same | same | unchanged |
-| sonar `aspect_floor` | `f_aspect = floor + (1 - floor) x |sin aspect|` | 0.3 | 0.4 | 0.5 | model 1 accepted, numbers proposed |
+| sonar `aspect_floor` | `f_aspect = floor + (1 - floor) x abs(sin aspect)` | 0.3 | 0.4 | 0.5 | model 1 accepted, numbers proposed |
 | sonar `layer_factor` | reach below the thermocline | 0.4 | 0.5 | 0.6 | model 1 accepted, numbers proposed |
 | sonar `sure_fraction` | sure echo inside this fraction of `R_eff` | 0.4 | 0.4 | 0.5 | decided |
 | sonar `area_base`, `area_span` | ring = `base + span x d / R_eff` | 25, 150 m | same | same | decided |
