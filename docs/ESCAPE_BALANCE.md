@@ -2,7 +2,9 @@
 
 Status: brainstorm and proposal, 2026-10-24; detection section reworked to the owner's
 direction on 2026-10-25 (section 3.1); after the owner's review of the second-prototype
-stories the brainstorm went back to mental models (section 7), which is where it stands. Requirement issue #34 (decisions go there), bug
+stories the brainstorm went back to mental models (section 7) and, on 2026-11-01, to the
+player archetypes (section 8), which is where it stands. Issue #34 holds the record up to
+that point and is closed; the discussion continues on #37. Requirement issue #37 (decisions go there; #34 is the closed record), bug
 #35 (the stern chase stalemate found on the way). Nothing in this page is implemented yet;
 the numbers come from `scripts/escape_study.py`, a headless harness that plays a found boat
 against the escorts with fixed evasion recipes, under the current rules and under a
@@ -382,6 +384,38 @@ The study's "found at 3 km" cases are really the second and third openings, and 
 3. Prototype models 1, 2 and 4 in the study and render the five stories above from the sim, then compare against the imagined versions: where they differ is where the numbers (aspect factor, layer factor, cloud duration, threshold) need tuning or where the model is wrong.
 4. Only then write the requirement's acceptance criteria and the parameter sheet.
 
+
+## 8. Player archetypes (owner, 2026-11-01) and what each needs from the sim
+
+The owner categorised the exposure scenarios from the player's side (#34, last comment;
+continued on #37). They are the player-side mental model; section 7 is the sim-side one.
+
+| archetype | what the player relies on | sim mechanic it needs | today | target outcome |
+| --- | --- | --- | --- | --- |
+| **top-notch**: planned exposure as a lure | the escorts' reaction is *predictable*: a torpedo (or a deliberate periscope flash) pulls the hunter to a datum far from the boat, the screen re-forms toward that datum and opens the far side, the boat is already there | the torpedo track line datum and a sweep along it that keeps the hunter busy for 10 min or more; the screen standing toward the datum; the datum the escorts chase shown on the HUD; the leash bounding how far the lure works | split/screen toward the datum exists (M2); the torpedo datum is a point 2 km back; the HUD shows nothing of what the escorts chase | the hunter chases the ghost, the boat is never pinged, the attack lands on the open flank |
+| **veteran**: knows every limitation | the deaf sprint, the thermocline, the blind zone and baffles, the shadows (merchant, explosion cloud); small moves until the escort gives up; then follows the escort back in its wake and baffles | section 7 models 1 to 4, plus the escort's own wake and baffles as a shadow a boat can ride home in | baffles, blind zone and sprint deafness prototyped; aspect, layer, cloud, depth bands not | the hunter loses the track in most hunts; the convoy is not out of reach when it does |
+| **average**: trial and error | sees what works: the ring shrinking or vanishing, the gauge falling, the set depth in the log | legibility: ring, gauge, set depth, why an echo was lost, why they broke off | the log says `pinged us`; nothing else | 50 / 50 at `patrol`; the attack is interrupted and must be set up again |
+| **reckless**: keeps the plan, fights | stays at periscope depth to shoot, fires down the throat | the shallow band lethal with an exact sighting; `comb` evasion and the glance rule (#22) | exists | lost nearly always (`cadet` the exception) |
+| **panic**: flees or dives ever deeper | hopes speed or depth alone will do it | speed loud (aspect x speed in the echo strength; a straight track is led); depth with a cost (a safe depth that shrinks with hull damage) and the depth bands reaching deep anyway | a straight flank run is today the safest recipe (#35) and 150 m is free | lost nearly always, and the player can see why |
+
+Principles that fall out: (1) the escorts' decisions are deterministic and visible, the
+randomness lives in detection; the datum (point, ring, line) and the hunter's intention are on
+the HUD. (2) Every panic option fails for a legible reason, every veteran option works for a
+visible one. (3) Escaping costs the attack: the convoy gains 20 to 30 min; following the
+escort back or being on the far flank already are the ways to keep the attack alive (#24).
+(4) Difficulty scales thresholds, not mechanics.
+
+Missing, grouped: detection (aspect, thermocline, explosion cloud, the escort's wake as a
+shadow); escort behaviour (torpedo line sweep, depth bands, stand-down reasons, the hunter's
+intention as a state); boat (safe depth vs damage, the gauge; later decoy and night surface
+run); HUD (ring, line, gauge, intention, set depth, the one-indicator rule).
+
+Next step, still no implementation: the five archetype stories as imagined tables in the
+agreed format, from one opening at `patrol` (periscope sighted at 1.5 km, day) plus the
+top-notch one from its own opening (a torpedo as a lure), as the specification the study and
+the sim must then reproduce. Two questions on #37 first: the cost of "ever deeper" (safe depth
+vs damage, the bands, or both), and whether the returning escort's wake and baffles are a
+shadow the boat may ride at periscope depth or deep only.
 
 ## Appendix: the study
 
