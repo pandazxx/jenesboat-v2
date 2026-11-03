@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from jenesboat_v2.sim import ai, detection, difficulty
 from jenesboat_v2.sim import escort as escort_ai
 from jenesboat_v2.sim.detection import Contact
-from jenesboat_v2.sim.escort import Datum, EscortState
+from jenesboat_v2.sim.escort import Cloud, Datum, EscortState
 from jenesboat_v2.sim.geo import bearing, clamp, distance, project, track_angle
 from jenesboat_v2.sim.params import FREIGHTER, KNOT, Difficulty, Rules, ShipType
 from jenesboat_v2.sim.submarine import Submarine, new_submarine
@@ -68,8 +68,10 @@ class Ship(Vessel):
         data["alerted"] = self.alert_until > -math.inf
         if self.kind == "military":
             data["mode"] = self.escort.mode
+            data["intent"] = self.escort.intent
             data["charges"] = max(self.escort.charges, 0)
             data["sonar_m"] = round(self.escort.sonar_range)
+            data["echo"] = self.escort.echo
         return data
 
 
@@ -120,8 +122,18 @@ class World:
     events: list[dict] = field(default_factory=list)  # pending, drained by the game loop
     _known: dict[str, str] = field(default_factory=dict)  # ship id -> contact method
     datum: Datum | None = None  # where the escorts think the boat is
+    hunt_since: float | None = None  # s, when the escorts' alarm was raised (the hunt's clock)
+    hunt_from: tuple[float, float] | None = (
+        None  # the convoy centre at the alarm (the leash's post)
+    )
+    observed_torpedoes: set[int] = field(default_factory=set)  # torpedoes the escorts have heard
+    warning_due: tuple[float, float, float, str] | None = None  # (t, x, y, by): the convoy's signal
     depth_charges: list[DepthCharge] = field(default_factory=list)
     next_charge_id: int = 0
+    clouds: list[Cloud] = field(default_factory=list)  # disturbed water left by patterns
+    layer_depth: float | None = None  # m, this hunt's thermocline (None: no layer)
+    layer_known: bool = False  # the boat has crossed the layer and knows where it is
+    _stress_told: float = -math.inf  # s, the last time the hull groaned in the log
     rng: random.Random = field(default_factory=lambda: random.Random(0))
     difficulty: Difficulty = field(default_factory=difficulty.get)  # what this hunt runs on
 
@@ -183,6 +195,16 @@ class World:
             "bonus": self.bonus,
             "torpedoes_left": self.torpedoes_left,
         }
+
+    def echo_reach(self) -> float:
+        """The HUD's ``ECHO`` figure: how far a settled destroyer could hold the boat right
+        now, taken from the nearest one (0 when there is none)."""
+        escorts = [s for s in self.active_ships if s.kind == "military"]
+        if not escorts:
+            return 0.0
+        sub = self.player
+        nearest = min(escorts, key=lambda s: distance(s.x, s.y, sub.x, sub.y))
+        return escort_ai.effective_reach(self, nearest, settled=True)
 
     def emit(self, event: str, **data) -> None:
         self.events.append({"event": event, "t": round(self.time, 2), **data})
@@ -253,6 +275,7 @@ class World:
         self._sense()
         self._lookouts(dt)
         escort_ai.step(self, dt)
+        self._deliver_warning()
         for ship in self.ships:
             if ship.active:
                 if ship.kind == "merchant":
@@ -265,6 +288,8 @@ class World:
                 self._check_escaped(ship)
         self._run_torpedoes(dt)
         self._run_depth_charges(dt)
+        self._hull_stress(dt)
+        self.clouds = [c for c in self.clouds if c.until > self.time]
         if not self.mission_over:
             mission = self.mission()
             if mission["status"] != "active":
@@ -317,9 +342,21 @@ class World:
         self._known = known
 
     def _lookouts(self, dt: float) -> None:
-        """Ships that keep the boat in sight for ``spot_time`` raise the alarm."""
+        """Ships that keep the boat in sight for ``spot_time`` raise the alarm; an escort with
+        radar finds a surfaced boat at once, exactly, and tells the group like a sighting."""
         sub = self.player
         det = self.rules.detection
+        radar = self.rules.radar.range
+        if radar > 0.0 and sub.surfaced:
+            for ship in self.active_ships:
+                if ship.kind == "military" and distance(sub.x, sub.y, ship.x, ship.y) <= radar:
+                    fresh = not ship.alerted(self.time)
+                    self.alert_group(sub.x, sub.y, reason="radar", by=ship.ship_id, quiet=not fresh)
+                    escort_ai.report(self, sub.x, sub.y, "radar", ship.ship_id)
+                    break
+        if self.layer_depth is not None and sub.depth > self.layer_depth and not self.layer_known:
+            self.layer_known = True
+            self.emit("layer", depth=round(self.layer_depth))
         for ship in self.active_ships:
             if detection.ship_sees_sub(sub, ship, self.light, det):
                 ship.spot_timer = min(ship.spot_timer + dt, det.spot_time)
@@ -331,6 +368,38 @@ class World:
                     escort_ai.report(self, sub.x, sub.y, "sighted", ship.ship_id)
             else:
                 ship.spot_timer = max(0.0, ship.spot_timer - dt)
+
+    def warn_convoy(self, x: float, y: float, by: str) -> None:
+        """An escort reports the boat at (x, y): the commodore's emergency turn is signalled
+        and answered ``warning_delay`` later (#39).  A signal already on its way stands; a
+        convoy already running just has its alarm refreshed."""
+        reach = escort_ai.MERCHANT_WARNING_RANGE
+        near = [
+            s
+            for s in self.active_ships
+            if s.kind == "merchant" and distance(x, y, s.x, s.y) <= reach
+        ]
+        if near and all(s.alerted(self.time) for s in near):
+            self.alert_group(x, y, "escort", by, quiet=True, radius=reach)
+            return
+        if self.warning_due is None:
+            delay = self.rules.merchant_ai.warning_delay
+            self.warning_due = (self.time + delay, x, y, by)
+
+    def _deliver_warning(self) -> None:
+        if self.warning_due is None or self.time < self.warning_due[0]:
+            return
+        _, x, y, by = self.warning_due
+        self.warning_due = None
+        reach = escort_ai.MERCHANT_WARNING_RANGE
+        told = [
+            s.ship_id
+            for s in self.active_ships
+            if s.kind == "merchant" and distance(x, y, s.x, s.y) <= reach
+        ]
+        if told:
+            self.emit("convoy_warned", by=by, ships=told)
+        self.alert_group(x, y, "escort", by, quiet=True, radius=reach)
 
     def alert_group(
         self,
@@ -431,7 +500,40 @@ class World:
             if hurt > 0.0 and not sub.destroyed:
                 sub.damage = min(1.0, sub.damage + hurt)
                 self.emit("damage", level=round(sub.damage, 2), destroyed=sub.destroyed)
+            self._add_cloud(charge.x, charge.y)
         self.depth_charges = [c for c in self.depth_charges if not c.burst]
+
+    def _add_cloud(self, x: float, y: float) -> None:
+        """A burst leaves disturbed water the sonar cannot hear through; bursts near an
+        existing cloud feed it instead of making another."""
+        sonar = self.rules.sonar
+        until = self.time + sonar.cloud_duration
+        for cloud in self.clouds:
+            if distance(cloud.x, cloud.y, x, y) <= cloud.radius:
+                cloud.until = until
+                return
+        self.clouds.append(Cloud(x, y, until, sonar.cloud_radius))
+
+    def _hull_stress(self, dt: float) -> None:
+        """Below the safe depth (which shrinks with the damage taken) the hull loses
+        ``overdepth_rate`` per second for every 20 m of excess, and says so."""
+        sub = self.player
+        excess = sub.depth - sub.safe_depth
+        if excess <= 0.0 or sub.destroyed:
+            return
+        before = sub.damage
+        sub.damage = min(1.0, sub.damage + sub.spec.overdepth_rate * excess / 20.0 * dt)
+        if self.time - self._stress_told >= 10.0 or sub.destroyed:
+            self._stress_told = self.time
+            self.emit(
+                "hull_stress",
+                depth=round(sub.depth),
+                safe_depth=round(sub.safe_depth),
+                level=round(sub.damage, 2),
+                destroyed=sub.destroyed,
+            )
+        elif sub.destroyed and before < 1.0:
+            self.emit("damage", level=1.0, destroyed=True)
 
     # --- output ----------------------------------------------------------------------------
 
@@ -449,10 +551,27 @@ class World:
                     "x": round(self.datum.x),
                     "y": round(self.datum.y),
                     "age": round(self.time - self.datum.t),
+                    "ring": round(self.datum.ring),
+                    "kind": self.datum.kind,
+                    "band": self.datum.band,
+                    "assumed": self.datum.assumed,
+                    "heading": round(self.datum.heading),
+                    "length": round(self.datum.length),
                 }
                 if self.datum
                 else None
             ),
+            "clouds": [
+                {
+                    "x": round(c.x),
+                    "y": round(c.y),
+                    "radius": round(c.radius),
+                    "until": round(c.until),
+                }
+                for c in self.clouds
+            ],
+            "layer": round(self.layer_depth) if self.layer_known and self.layer_depth else None,
+            "echo_reach": round(self.echo_reach()),
             "tonnage": self.tonnage,
             "bonus": self.bonus,
             "difficulty": self.difficulty.name,

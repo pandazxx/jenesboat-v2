@@ -53,6 +53,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="windowed: save a PNG after 2 s of game time and quit (needs a display)",
     )
     p.add_argument(
+        "--log",
+        default=None,
+        metavar="FILE",
+        help="append every event of the run (the battle log) to FILE as JSON lines",
+    )
+    p.add_argument(
         "--script",
         default=None,
         help=(
@@ -129,19 +135,23 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.version:
         print(f"jenesboat-v2 {VERSION} (build {BUILD_ID})")
         return 0
-    if args.headless:
-        run_headless(args.seconds, args.dt, args.script, args.trace, args.seed, args.difficulty)
-        return 0
-    from jenesboat_v2.app import main as app_main
+    events.log_to_file(args.log)
+    try:
+        if args.headless:
+            run_headless(args.seconds, args.dt, args.script, args.trace, args.seed, args.difficulty)
+            return 0
+        from jenesboat_v2.app import main as app_main
 
-    app_main(
-        seed=args.seed,
-        size=parse_size(args.size),
-        touch_layout=args.touch,
-        screenshot=args.screenshot,
-        difficulty=args.difficulty,
-    )
-    return 0
+        app_main(
+            seed=args.seed,
+            size=parse_size(args.size),
+            touch_layout=args.touch,
+            screenshot=args.screenshot,
+            difficulty=args.difficulty,
+        )
+        return 0
+    finally:
+        events.log_to_file(None)
 
 
 def parse_size(text: str | None) -> tuple[int, int] | None:

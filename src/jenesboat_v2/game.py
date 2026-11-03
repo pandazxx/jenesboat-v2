@@ -37,6 +37,7 @@ class Controls:
     rudder_center: bool = False  # rudder amidships
     dive_toggle: bool = False
     deep: bool = False
+    scope: bool = False  # V: raise / lower the periscope
     fire: bool = False
     zoom_in: bool = False
     zoom_out: bool = False
@@ -108,6 +109,10 @@ class Game:
             sub.toggle_dive()
         if controls.deep:
             sub.order_deep()
+        if controls.scope:
+            up = sub.toggle_scope()
+            self.world.emit("scope", up=up)
+            self._drain()
         if controls.fire:
             self.fire()
         if controls.zoom_in:
@@ -269,8 +274,8 @@ def describe(name: str, data: dict) -> str | None:
     if name == "contact_lost":
         return f"{data['ship']}: contact lost"
     if name == "alert":
-        why = "we were sighted" if data["reason"] == "sighted" else "torpedo"
-        return f"{', '.join(data['ships'])} running: {why}"
+        why = {"sighted": "we were sighted", "radar": "radar has us", "torpedo": "torpedo"}
+        return f"{', '.join(data['ships'])} running: {why.get(data['reason'], data['reason'])}"
     if name == "fire":
         return f"torpedo {data['torpedo']} away, course {data['heading']:03.0f}"
     if name == "fire_refused":
@@ -291,16 +296,62 @@ def describe(name: str, data: dict) -> str | None:
     if name == "torpedo_seen":
         return f"{data['ship']} heard torpedo {data['torpedo']} and turns to comb its track"
     if name == "escort_alarm":
-        how = {"sonar": "pinged us", "sighted": "sighted us", "torpedo": "was torpedoed"}
+        how = {
+            "sonar": "pinged us",
+            "sighted": "sighted us",
+            "radar": "has us on radar",
+            "torpedo": "heard our torpedo",
+        }
         return f"ESCORT: {data['by']} {how.get(data['reason'], data['reason'])}"
+    if name == "torpedo_line":
+        return f"{data['by']} has our torpedo's track: the escorts will sweep it"
+    if name == "convoy_warned":
+        return f"the convoy is told by {data['by']}: {', '.join(data['ships'])} turn away"
+    if name == "echo_lost":
+        return f"{data['ship']} lost the echo: {data['why']}"
+    if name == "blind_lead":
+        return f"{data['ship']} lost us and assumes we ran off on {data['heading']:03d}"
+    if name == "run_abandoned":
+        return f"{data['ship']} breaks off its run"
+    if name == "escort_intent":
+        what = {
+            "hunting": "is hunting us",
+            "attacking": "is attacking",
+            "sweeping": "sweeps the torpedo track",
+            "searching": "is searching",
+            "returning": "returns to the convoy",
+            "screening": "screens the convoy",
+        }
+        return f"{data['ship']} {what[data['intent']]}" if data["intent"] in what else None
+    if name == "layer":
+        return f"thermocline: the water changes at {data['depth']} m (we are below it)"
+    if name == "hull_stress":
+        return (
+            f"HULL GROANING at {data['depth']} m, safe depth {data['safe_depth']} m: "
+            f"damage {data['level'] * 100:.0f}%"
+        )
+    if name == "scope":
+        return "periscope up" if data["up"] else "periscope down"
     if name == "escort_split":
         return (
             f"escort splits: {', '.join(data['hunters'])} hunting, "
             f"{', '.join(data['screens']) or 'none'} screening"
         )
     if name == "escort_stand_down":
-        return "escort lost the track, back to formation"
+        why = {
+            "lost": "lost the track",
+            "leash": "will not leave the convoy any further",
+            "time": "has hunted long enough",
+            "charges": "is out of depth charges",
+        }
+        return f"escort {why.get(data.get('reason'), 'lost the track')}, back to formation"
     if name == "depth_charge_run":
+        if "shallow" in data:
+            guess = " on a guess" if data.get("assumed") else ""
+            return (
+                f"{data['ship']} is making a depth charge run{guess}, charges set "
+                f"{data['shallow']}-{data['deep']} m"
+            )
         return f"{data['ship']} is making a depth charge run"
     if name == "depth_charge" and data["damage"] > 0:
         return "DEPTH CHARGE close!"

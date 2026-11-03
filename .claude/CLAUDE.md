@@ -27,6 +27,9 @@ propeller speed, weapons, and ship AI strategies). Art style: simple lines/boxes
   `sim/difficulty.py` and selected with `pick(world.level, slot)`; a new slot is a field on
   `Strategies` with its signature documented in `sim/difficulty.py`.
 - The browser runtime (pygbag) is CPython 3.12: keep the package 3.12-compatible.
+- Balance questions get a headless study before a rule change: `scripts/escape_study.py`
+  and `docs/ESCAPE_BALANCE.md` are the pattern (measure the current rules, prototype, file
+  the requirement issue with the numbers).
 - `just build-web <id>` builds `dist/web`; `just sim` runs the headless simulation;
   `just agent-web-test <url>` drives a build in headless Chromium (see `docs/AGENT_TESTING.md`).
 - Conventions for branches, commits, tags, releases and web build naming: `docs/CONVENTIONS.md`.

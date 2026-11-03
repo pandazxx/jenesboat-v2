@@ -53,7 +53,7 @@ The pieces, all in `sim/params.py`:
 | parameter block | a frozen dataclass of numbers for one part of the sim: `SonarParams`, `DepthChargeParams`, `EscortAIParams`, `TorpedoParams`, ... (as before this milestone) |
 | `Rules` | all the blocks the sim uses, bundled in one object. `Rules()` with no arguments is the base sheet |
 | slot | one decision point in the AI, as a field of `Strategies`: `escort_search`, `escort_evade`, `merchant_flee`. Each field holds the *name* of the behaviour to use |
-| strategy | one behaviour that can fill a slot: a function in the AI module, registered under a name (`"box"`, `"none"`, `"zigzag"`, `"comb"`) |
+| strategy | one behaviour that can fill a slot: a function in the AI module, registered under a name (`"sweep"`, `"box"`, `"none"`, `"zigzag"`, `"comb"`) |
 | `Strategies` | the chosen strategy name for every slot. `Strategies()` with no arguments is the base behaviour |
 | `Difficulty` | name, title, description, a `Rules` and a `Strategies` |
 | `DIFFICULTIES` | the table of the three: `cadet`, `patrol`, `veteran` |
@@ -93,7 +93,7 @@ Two rules keep this simple:
    escort.py reads    rules.sonar.range (3,600 m)     escort.step   -> pick(.., "escort_evade")
                       rules.escort_ai.lose_track_time                 -> no_evasion() or comb_the_track()
    world.py reads     rules.merchant_ai.panic_range   escort._hunt  -> pick(.., "escort_search")
-                      rules.detection.spot_time                       -> box_search()
+                      rules.detection.spot_time                       -> sweep_search()
    scenario.py reads  rules.scenario.escorts (3)      ai.merchant   -> pick(.., "merchant_flee")
                       rules.torpedo.reload_time                       -> flee()
 ```
@@ -153,7 +153,7 @@ whatever its name, so the caller does not care which one it got:
 
 | slot | called as | strategies today | chosen by |
 | --- | --- | --- | --- |
-| `escort_search` | `(world, ship, p: EscortAIParams) -> None`: steer a hunter whose fix on the boat is older than `FRESH_DATUM` | `box`: a square around the last fix that widens with time | all: `box` |
+| `escort_search` | `(world, ship, p: EscortAIParams) -> None`: steer a hunter whose fix on the boat is too stale to attack (after the datum attack and the blind lead, #37) | `sweep`: legs through the datum from alternating directions, so the sonar cone covers the search area; `box`: the M2 square around the last fix (never points the cone through the middle) | all: `sweep` |
 | `escort_evade` | `(world, ship, dt) -> bool`: react to torpedoes in the water; `True` while dodging (the ship's normal behaviour is skipped that tick) | `none`: never notices a torpedo (M2); `comb`: hear a torpedo that will pass too close and turn hard to comb its track at full speed until it has gone by (#22) | `cadet`: `none`; `patrol`, `veteran`: `comb` |
 | `merchant_flee` | `(ship, t, rules: Rules) -> None`: steer an alerted merchant; `ship.shelter` is set when an escort covers it | `zigzag`: run away zigzagging, or for the spot behind an escort | all: `zigzag` |
 

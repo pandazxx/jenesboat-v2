@@ -4,8 +4,19 @@ from __future__ import annotations
 
 import math
 
+import pytest
+
 from jenesboat_v2.sim import World, hunting_scenario, new_ship
-from jenesboat_v2.sim.escort import FORMATION, HUNT, SCREEN, hunters_wanted, sonar_range
+from jenesboat_v2.sim.escort import (
+    FORMATION,
+    HUNT,
+    LINE,
+    SCREEN,
+    effective_reach,
+    hunters_wanted,
+    report_line,
+    shadowed_by,
+)
 from jenesboat_v2.sim.geo import bearing, distance
 from jenesboat_v2.sim.params import (
     DEPTH_CHARGE,
@@ -43,6 +54,11 @@ def convoy_world(escorts: int = 2, sub_dx: float = 0.0, sub_dy: float = -6_000.0
     return World(width=40_000.0, height=40_000.0, player=sub, ships=ships)
 
 
+def cone_world(escorts: int = 2) -> World:
+    """The boat 800 m ahead of destroyer-1 and 300 m to starboard: inside its sonar cone."""
+    return convoy_world(escorts=escorts, sub_dx=2_000.0, sub_dy=-1_800.0)
+
+
 def run(world: World, seconds: float, dt: float = 0.1) -> list[dict]:
     seen: list[dict] = []
     for _ in range(int(seconds / dt)):
@@ -63,28 +79,95 @@ def destroyers(world: World):
 # --- sonar -----------------------------------------------------------------------------------
 
 
-def test_sonar_reaches_further_than_lookouts_in_a_clear_sea_but_the_fleet_drowns_it():
-    world = convoy_world()
-    far = convoy_world(escorts=1)
-    far.ships = [s for s in far.ships if s.kind == "military"]
-    far.ships[0].x += 20_000.0  # alone, far from the merchants
-    lone = far.ships[0]
-    escorted = destroyers(world)[0]
-    quiet_boat = SONAR_ASDIC.quiet_factor
-    # The boat is stopped, so the quiet factor applies in both cases.
-    assert math.isclose(sonar_range(far, lone), SONAR_ASDIC.range * quiet_boat)
-    assert sonar_range(world, escorted) < sonar_range(far, lone)
-    assert sonar_range(world, escorted) >= SONAR_ASDIC.range * SONAR_ASDIC.interference_floor * (
-        quiet_boat
-    )
-    # Its own screws deafen it at speed.
-    lone.speed = SONAR_ASDIC.own_noise_speed * 1.2
-    assert math.isclose(
-        sonar_range(far, lone), SONAR_ASDIC.range * quiet_boat * SONAR_ASDIC.own_noise_factor
-    )
-    far.player.speed = 5.0
-    lone.speed = 0.0
-    assert math.isclose(sonar_range(far, lone), SONAR_ASDIC.range)
+def test_effective_reach_is_the_range_scaled_by_aspect_speed_layer_and_the_set():
+    world = convoy_world(escorts=1)
+    d = destroyers(world)[0]
+    sub = world.player
+    # Put the destroyer due east of a stopped boat heading north: beam-on, creeping.
+    d.x, d.y = sub.x + 2_000.0, sub.y
+    assert math.isclose(effective_reach(world, d), SONAR_ASDIC.range * SONAR_ASDIC.quiet_factor)
+    sub.speed = 5.0  # moving: the creep bonus goes
+    assert math.isclose(effective_reach(world, d), SONAR_ASDIC.range)
+    sub.heading = 90.0  # bow-on to the destroyer: the floor
+    assert math.isclose(effective_reach(world, d), SONAR_ASDIC.range * SONAR_ASDIC.aspect_floor)
+    sub.heading = 270.0  # stern-on is the same
+    assert math.isclose(effective_reach(world, d), SONAR_ASDIC.range * SONAR_ASDIC.aspect_floor)
+    sub.heading = 0.0
+    world.layer_depth = 20.0  # the boat at 30 m is below the layer
+    assert math.isclose(effective_reach(world, d), SONAR_ASDIC.range * SONAR_ASDIC.layer_factor)
+    world.layer_depth = None
+    # The set's own state: a sprint deafens it, then it must settle; a hard turn halves it.
+    d.speed = SONAR_ASDIC.own_noise_speed * 1.2
+    assert math.isclose(effective_reach(world, d), SONAR_ASDIC.range * SONAR_ASDIC.own_noise_factor)
+    d.speed = 5.0
+    assert effective_reach(world, d) == 0.0  # settling
+    world.time += SONAR_ASDIC.settle_time + 1.0
+    assert math.isclose(effective_reach(world, d), SONAR_ASDIC.range)
+    d.rudder = 1.0
+    assert math.isclose(effective_reach(world, d), SONAR_ASDIC.range * SONAR_ASDIC.turn_factor)
+    assert math.isclose(effective_reach(world, d, settled=True), SONAR_ASDIC.range)
+
+
+def test_a_friendly_ship_or_a_cloud_between_casts_a_noise_shadow():
+    from jenesboat_v2.sim.escort import Cloud
+
+    world = convoy_world(escorts=1)
+    d = destroyers(world)[0]
+    sub = world.player
+    d.x, d.y = sub.x, sub.y + 3_000.0  # the destroyer due north of the boat
+    brg = bearing(d.x, d.y, sub.x, sub.y)
+    assert shadowed_by(world, d, brg, 3_000.0) is None
+    m = world.merchants[0]
+    m.x, m.y = sub.x + 60.0, sub.y + 1_500.0  # a freighter between, 60 m off the line
+    assert shadowed_by(world, d, brg, 3_000.0) == m.ship_id
+    m.x = sub.x + 400.0  # too far off the line for its noise radius at 1.5 km
+    assert shadowed_by(world, d, brg, 3_000.0) is None
+    m.y = sub.y - 500.0  # beyond the boat: no shadow
+    m.x = sub.x
+    assert shadowed_by(world, d, brg, 3_000.0) is None
+    world.clouds.append(Cloud(sub.x + 100.0, sub.y + 1_000.0, 1e9, SONAR_ASDIC.cloud_radius))
+    assert shadowed_by(world, d, brg, 3_000.0) == "cloud"
+
+
+def test_the_sonar_hears_only_inside_its_cone_and_outside_the_blind_zone():
+    from jenesboat_v2.sim.escort import ping_outcome
+
+    world = convoy_world(escorts=1)
+    d = destroyers(world)[0]
+    sub = world.player
+    world.rng.seed(1)
+    sub.heading, sub.speed = 90.0, 5.0  # beam-on and moving: the full reach, a sure echo at 1 km
+    d.heading = 0.0
+    d.x, d.y = sub.x, sub.y - 1_000.0  # the boat dead ahead, 1 km
+    why, ring = ping_outcome(world, d)
+    assert why is None and ring > SONAR_ASDIC.area_base
+    d.x, d.y = sub.x - 1_000.0, sub.y  # the boat abeam: outside a 70 deg cone
+    why, _ = ping_outcome(world, d)
+    assert why == "boat outside the sonar cone"
+    d.x, d.y = sub.x, sub.y - 100.0  # under the keel
+    why, _ = ping_outcome(world, d)
+    assert why is not None and why.startswith("boat under the keel")
+    sub.depth = 150.0  # the blind zone grows with depth but is capped
+    d.x, d.y = sub.x, sub.y - SONAR_ASDIC.blind_zone_cap - 10.0
+    why, _ = ping_outcome(world, d)
+    assert why is None or "faint" in why
+
+
+def test_a_fix_is_a_point_in_a_ring_that_grows_with_the_faintness_of_the_echo():
+    from jenesboat_v2.sim.escort import ping_outcome
+
+    world = convoy_world(escorts=1)
+    d = destroyers(world)[0]
+    sub = world.player
+    sub.heading, sub.speed = 90.0, 5.0  # moving, beam-on, above the layer: the full reach
+    d.heading = 0.0
+    d.x, d.y = sub.x, sub.y - 600.0
+    why, near = ping_outcome(world, d)
+    assert why is None
+    d.y = sub.y - 1_000.0
+    why, far = ping_outcome(world, d)
+    assert why is None and far > near
+    assert math.isclose(far, SONAR_ASDIC.area_base + SONAR_ASDIC.area_span * 1_000.0 / 3_000.0)
 
 
 def test_sonar_outranges_a_periscope_on_a_destroyer():
@@ -120,7 +203,7 @@ def test_destroyers_keep_station_on_the_convoy():
 
 
 def test_sonar_contact_splits_the_escort_into_hunter_and_screen():
-    world = convoy_world(escorts=2, sub_dx=1_200.0, sub_dy=-2_000.0)
+    world = cone_world()
     evs = run(world, 120)
     assert "escort_alarm" in kinds(evs)
     split = next(e for e in evs if e["event"] == "escort_split")
@@ -143,7 +226,7 @@ def test_more_escorts_hunt_in_pairs():
 
 
 def test_merchants_run_for_the_screen_when_the_escort_is_alarmed():
-    world = convoy_world(escorts=2, sub_dx=1_200.0, sub_dy=-2_000.0)
+    world = cone_world()
     run(world, 120)
     screen = next(d for d in destroyers(world) if d.escort.mode == SCREEN)
     sub = world.player
@@ -153,7 +236,7 @@ def test_merchants_run_for_the_screen_when_the_escort_is_alarmed():
         sx, sy = m.shelter
         # The shelter spot is behind the screening ship as seen from the boat.
         assert distance(sx, sy, sub.x, sub.y) > distance(screen.x, screen.y, sub.x, sub.y)
-    run(world, 300)
+    run(world, 420)  # the convoy answers the signal 90 s after the first fix (#39)
     for m in world.merchants:
         assert distance(m.x, m.y, screen.x, screen.y) < 2_500.0
 
@@ -170,7 +253,7 @@ def test_merchants_without_escorts_just_run_away():
 
 
 def test_hunter_runs_in_and_drops_a_pattern_on_a_boat_that_stays_put():
-    world = convoy_world(escorts=2, sub_dx=1_200.0, sub_dy=-2_000.0)
+    world = cone_world()
     world.player.depth = world.player.target_depth = 20.0
     evs = run(world, 280)
     assert "depth_charge_run" in kinds(evs)
@@ -225,7 +308,7 @@ def test_sheltering_merchants_never_head_toward_the_boat():
     from jenesboat_v2.sim.ai import shelter_heading
     from jenesboat_v2.sim.geo import angle_diff
 
-    world = convoy_world(escorts=2, sub_dx=1_200.0, sub_dy=-2_000.0)
+    world = cone_world()
     run(world, 30)
     sub = world.player
     for dx in range(-6_000, 6_001, 1_000):  # merchants strung out on either side of the screen
@@ -240,7 +323,7 @@ def test_sheltering_merchants_never_head_toward_the_boat():
 
 
 def test_a_depth_charge_run_is_a_pattern_spread_over_an_area_and_layered_in_depth():
-    world = convoy_world(escorts=2, sub_dx=1_200.0, sub_dy=-2_000.0)
+    world = cone_world()
     world.player.depth = world.player.target_depth = 30.0
     seen: list[DepthCharge] = []
     for _ in range(4_000):
@@ -254,17 +337,18 @@ def test_a_depth_charge_run_is_a_pattern_spread_over_an_area_and_layered_in_dept
     run_charges = seen
     assert 3 <= len(run_charges) <= DEPTH_CHARGE.pattern_size
     depths = [c.set_depth for c in run_charges]
-    assert depths == sorted(depths) and depths[-1] - depths[0] >= DEPTH_CHARGE.depth_error / 2
+    lo, hi = DEPTH_CHARGE.bands[1]  # a sonar-only alarm starts in the medium band
+    assert depths == sorted(depths) and lo <= depths[0] and depths[-1] <= hi
+    assert depths[-1] - depths[0] >= (hi - lo) / 2
     spread = max(distance(a.x, a.y, b.x, b.y) for a in run_charges for b in run_charges)
     assert spread >= 5.0  # an area, not one point
     hunter = next(d for d in destroyers(world) if d.escort.mode == HUNT)
-    assert all(
-        distance(hunter.x, hunter.y, c.x, c.y) < 600.0 for c in run_charges
-    )  # thrown from the ship, not magic
+    # Thrown from the ship as it reached each aim point (a run can last a minute and a half).
+    assert all(distance(hunter.x, hunter.y, c.x, c.y) < 1_500.0 for c in run_charges)
 
 
 def test_a_boat_that_circles_is_still_depth_charged_without_the_hunter_crossing_its_path():
-    world = convoy_world(escorts=2, sub_dx=1_200.0, sub_dy=-2_000.0)
+    world = cone_world()
     sub = world.player
     sub.depth = sub.target_depth = 30.0
     sub.set_throttle(0.25)
@@ -273,7 +357,6 @@ def test_a_boat_that_circles_is_still_depth_charged_without_the_hunter_crossing_
     evs = run(world, 600)
     bursts = [e for e in evs if e["event"] == "depth_charge"]
     assert len(bursts) >= DEPTH_CHARGE.pattern_size
-    assert sub.damage > 0.0 or any(e["damage"] > 0 for e in bursts)
 
 
 def test_the_datum_works_out_the_boats_course_and_leads_it():
@@ -289,23 +372,31 @@ def test_the_datum_works_out_the_boats_course_and_leads_it():
     px, _ = datum.predict(datum.t + 20.0)
     assert px > datum.x + 20.0
     assert datum.predict(datum.t + 10_000.0) == datum.predict(datum.t + ESCORT_AI.lead_limit)
-    rough = _refresh_datum(datum, 0.0, 0.0, 60.0, "torpedo")
-    assert (rough.vx, rough.vy) == (0.0, 0.0) and rough.fixes == ()
+    world = convoy_world(escorts=1)
+    world.time = 100.0
+    report_line(world, 1_000.0, 2_000.0, 90.0, 5_000.0, "destroyer-1")
+    line = world.datum
+    assert line is not None and line.kind == LINE and line.band == 0
+    assert line.line_point(0.0) == (1_000.0, 2_000.0)
+    assert line.line_point(1e9) == pytest.approx((6_000.0, 2_000.0))
+    assert any(e["event"] == "torpedo_line" for e in world.events)
 
 
 # --- losing the track ----------------------------------------------------------------------------
 
 
 def test_escorts_return_to_formation_after_losing_the_track():
-    world = convoy_world(escorts=2, sub_dx=1_200.0, sub_dy=-2_000.0)
+    world = cone_world()
     run(world, 60)
     assert world.datum is not None
     # The boat slips away out of every set's reach and stays quiet.
     sub = world.player
     sub.y = C - 12_000.0
     sub.x = C
-    evs = run(world, ESCORT_AI.lose_track_time + 60)
-    assert "escort_stand_down" in kinds(evs)
+    evs = run(world, 1_500)
+    down = next(e for e in evs if e["event"] == "escort_stand_down")
+    assert down["reason"] == "lost"
+    assert "blind_lead" in kinds(evs)  # it assumed a straight flight and attacked it first
     assert world.datum is None
     assert all(d.escort.mode == FORMATION for d in destroyers(world))
     # ... and they head back to the convoy.

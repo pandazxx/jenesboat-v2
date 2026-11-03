@@ -83,6 +83,8 @@ class SubmarineParams:
     hydrophone_range: float  # m, bearing-only contacts
     hydrophone_min_depth: float  # m, hydrophones useless on the surface
     hydrophone_max_speed: float  # m/s, own noise masks contacts above this
+    scope_raise_time: float = 5.0  # s from the order to the periscope being up
+    overdepth_rate: float = 0.001  # hull damage per second for every 20 m below the safe depth
 
 
 @dataclass(frozen=True)
@@ -117,24 +119,41 @@ class MerchantAIParams:
     spread_angle: float  # deg between neighbours so a group fans out
     escape_range: float  # m from the boat at which an alerted merchant counts as escaped
     panic_range: float  # m, a torpedo hit alerts merchants within this distance
+    warning_delay: float  # s between an escort's report of the boat and the merchants' turn away
 
 
 @dataclass(frozen=True)
 class SonarParams:
-    """A destroyer's active sonar (ASDIC): long reach, but blind to the boat's depth and easily
-    drowned by noise.  Range is ``range`` times the factors below."""
+    """A destroyer's active sonar (ASDIC).  One ping gives one *effective reach*:
 
-    range: float  # m, quiet sea, boat at full submerged noise
-    min_range: float  # m, inside this the echo is lost (the attacker is over the boat)
+        R_eff = range x f_aspect x f_speed x f_layer x f_set   (0 in a noise shadow)
+
+    the range at which this ship can hold this boat right now; an echo comes back inside it
+    (outside the blind zone under the keel and the arc the set can be trained over), surely
+    inside ``sure_fraction`` of it and with a chance falling to zero at its edge.  The fix is
+    a random point in a ring whose radius grows as the echo gets fainter."""
+
+    range: float  # m, a beam-on moving boat above the layer, settled set
+    arc: float  # deg either side of the bow the set can be trained; the rest is the baffles
+    min_range: float  # m, floor of the blind zone under the keel
+    depth_blind_ratio: float  # the echo is lost inside depth x ratio (the beam cannot tilt down)
+    blind_zone_cap: float  # m, the blind zone never exceeds this
     own_noise_speed: float  # m/s, faster than this the ship's own screws deafen the set
-    own_noise_factor: float  # range multiplier while faster than that
-    interference_radius: float  # m, other ships this close add their noise to the sea
-    interference_per_ship: float  # range lost per neighbouring ship (fraction of range)
-    interference_floor: float  # range never drops below this fraction
+    own_noise_factor: float  # reach multiplier while faster than that (f_set, sprinting)
+    settle_time: float  # s after slowing below own_noise_speed before the set hears again
+    turn_factor: float  # reach multiplier while the rudder is more than half over (f_set)
     quiet_speed: float  # m/s, a boat creeping at or below this is harder to hear
-    quiet_factor: float  # range multiplier for a creeping boat
+    quiet_factor: float  # reach multiplier for a creeping boat (f_speed)
+    aspect_floor: float  # f_aspect = floor + (1 - floor) x |sin aspect|: end-on gives the floor
+    layer_factor: float  # reach multiplier when the boat is below the thermocline (f_layer)
+    sure_fraction: float  # a ping inside this fraction of R_eff is a sure echo
+    area_base: float  # m, radius of the fix's ring at zero range
+    area_span: float  # m, ring radius added per unit of d / R_eff (175 m at the edge of 3 km)
+    noise_base: float  # m, noise radius of a stopped or sunk friendly ship (its shadow)
+    noise_per_knot: float  # m of noise radius per knot of that ship's speed
+    cloud_radius: float  # m, the noise shadow a pattern's bursts leave in the water
+    cloud_duration: float  # s the cloud lasts
     ping_interval: float  # s between pings; the fix is as old as the last ping
-    position_error: float  # m, error of the fix (each axis) before it is used as a datum
 
 
 @dataclass(frozen=True)
@@ -143,13 +162,15 @@ class DepthChargeParams:
     lethal_radius: float  # m, a burst this close breaks the boat
     damage_radius: float  # m, a burst this close hurts the boat
     damage: float  # hull damage (0..1; the boat is lost at 1) at the edge of damage_radius
-    depth_error: float  # m, the pattern is layered over the boat's depth +- this
-    min_depth: float  # m, shallowest setting
-    pattern_size: int  # charges per attack run, layered in depth and thrown to both sides
+    bands: tuple[tuple[float, float], ...]  # m, the depth bands a pattern is set in, search order
+    confirm_damage: float  # a pattern doing at least this much confirms its band; less moves on
+    pattern_size: int  # charges per attack run, spread over the band and thrown to both sides
     drop_interval: float  # s between charges in a pattern
     throw_range: float  # m, projectors throw a charge up to this far from the ship
     scatter: float  # m, each charge lands up to this far either side of the predicted path
-    pattern_cooldown: float  # s before the same ship starts another run
+    blind_scatter: float  # m, a pattern on an assumed flight straddles the path out to this far
+    pattern_cooldown: float  # s before the same ship starts another run (the rack reload)
+    run_max_time: float  # s, a run whose aim points the ship cannot reach is abandoned
     magazine: int  # charges carried per destroyer
 
 
@@ -180,9 +201,19 @@ class EscortAIParams:
     max_hunters: int
     track_window: float  # s of sonar fixes used to estimate the boat's course and speed
     track_min_baseline: float  # s, fixes closer in time than this give no course estimate
-    max_track_speed: float  # m/s, a faster estimate is noise (the boat's best submerged speed)
+    max_track_speed: (
+        float  # m/s, the boat's best submerged speed: caps the track, drives the blind lead
+    )
     lead_limit: float  # s, the prediction is never carried further than this past the last fix
-    lose_track_time: float  # s without a fix or sighting before the escort stands down
+    lose_track_time: (
+        float  # s without a fix, counted from the hunter's arrival, before standing down
+    )
+    datum_attack_age: (
+        float  # s, a hunter still attacks the dead-reckoned position with a fix this old
+    )
+    blind_attacks: int  # how many attacks on the assumed flight before the hunter gives it up
+    hunt_leash: float  # m from the convoy centre a hunter will not follow the boat beyond
+    max_hunt_time: float  # s after the alarm the escorts give the hunt up
     station_ahead: float  # m, formation station ahead of the convoy centre
     station_abeam: float  # m, formation station abeam of the convoy centre (alternating sides)
     screen_distance: float  # m from the convoy centre toward the threat
@@ -197,6 +228,24 @@ class EscortAIParams:
     search_max: float  # m
     shelter_distance: float  # m behind the screening ship that merchants run to
     shelter_radius: float  # m, merchants this near the shelter point stop closing in
+
+
+@dataclass(frozen=True)
+class SeaParams:
+    """The water of one hunt: a thermocline (temperature layer) that bends sound away, so a
+    boat below it gives a weaker echo.  Its depth is drawn per hunt from the seed."""
+
+    layer_min: float  # m, the layer is no shallower than this
+    layer_max: float  # m, and no deeper
+    layer_chance: float  # 0..1, the chance a hunt has a layer at all
+
+
+@dataclass(frozen=True)
+class RadarParams:
+    """Surface-search radar on the escorts: detects surfaced vessels only, exactly, and is
+    handled like a sighting.  ``range`` 0 means no radar at this level."""
+
+    range: float  # m
 
 
 # --- vessels -------------------------------------------------------------------------------
@@ -322,17 +371,32 @@ DECK_GUN_88 = DeckGunParams(
 
 SONAR_ASDIC = SonarParams(
     range=3_000.0,
+    arc=70.0,
     min_range=150.0,
+    depth_blind_ratio=3.0,
+    blind_zone_cap=300.0,
     own_noise_speed=15.0 * KNOT,
-    own_noise_factor=0.4,
-    interference_radius=2_500.0,
-    interference_per_ship=0.12,
-    interference_floor=0.4,
+    own_noise_factor=0.25,
+    settle_time=20.0,
+    turn_factor=0.5,
     quiet_speed=2.5 * KNOT,
     quiet_factor=0.7,
+    aspect_floor=0.4,
+    layer_factor=0.5,
+    sure_fraction=0.4,
+    area_base=25.0,
+    area_span=150.0,
+    noise_base=150.0,
+    noise_per_knot=30.0,
+    cloud_radius=150.0,
+    cloud_duration=180.0,
     ping_interval=5.0,
-    position_error=40.0,
 )
+
+SEA = SeaParams(layer_min=40.0, layer_max=90.0, layer_chance=1.0)
+
+RADAR_NONE = RadarParams(range=0.0)
+RADAR_SURFACE_SEARCH = RadarParams(range=20_000.0)
 
 TORPEDO_EVASION = TorpedoEvasionParams(
     hear_range=1_200.0,
@@ -351,13 +415,15 @@ DEPTH_CHARGE = DepthChargeParams(
     lethal_radius=12.0,
     damage_radius=45.0,
     damage=0.4,
-    depth_error=25.0,
-    min_depth=15.0,
+    bands=((15.0, 40.0), (40.0, 80.0), (80.0, 150.0)),
+    confirm_damage=0.10,
     pattern_size=6,
     drop_interval=1.0,
     throw_range=150.0,
     scatter=15.0,
-    pattern_cooldown=45.0,
+    blind_scatter=60.0,
+    pattern_cooldown=120.0,
+    run_max_time=90.0,
     magazine=40,
 )
 
@@ -379,6 +445,7 @@ MERCHANT_AI = MerchantAIParams(
     spread_angle=20.0,
     escape_range=20_000.0,
     panic_range=6_000.0,
+    warning_delay=90.0,
 )
 
 ESCORT_AI = EscortAIParams(
@@ -389,6 +456,10 @@ ESCORT_AI = EscortAIParams(
     max_track_speed=7.6 * KNOT,
     lead_limit=90.0,
     lose_track_time=300.0,
+    datum_attack_age=180.0,
+    blind_attacks=2,
+    hunt_leash=10_000.0,
+    max_hunt_time=1_800.0,
     station_ahead=1_200.0,
     station_abeam=1_500.0,
     screen_distance=2_000.0,
@@ -438,6 +509,8 @@ class Rules:
     evasion: TorpedoEvasionParams = TORPEDO_EVASION
     torpedo_hit: TorpedoHitParams = TORPEDO_HIT
     scenario: ScenarioParams = SCENARIO
+    sea: SeaParams = SEA
+    radar: RadarParams = RADAR_NONE
 
 
 @dataclass(frozen=True)
@@ -445,7 +518,7 @@ class Strategies:
     """Which behaviour fills each AI decision point (a *slot*).  Each value names a strategy
     registered in ``sim/difficulty.py``; the defaults are the M1/M2 behaviours."""
 
-    escort_search: str = "box"  # how a hunter sweeps for a boat whose track has gone stale
+    escort_search: str = "sweep"  # how a hunter looks for a boat whose track has gone stale
     escort_evade: str = "none"  # what an escort does about a torpedo running at it (comb: dodge)
     merchant_flee: str = "zigzag"  # how an alerted merchant runs
 
@@ -464,15 +537,32 @@ class Difficulty:
 CADET = Difficulty(
     name="cadet",
     title="Cadet",
-    description="one destroyer with a short sonar and a short memory that never dodges, "
-    "lighter charges, quick reloads, every hit counts",
+    description="one destroyer with a short sonar, a narrow cone and a short memory that never "
+    "dodges, lighter charges, quick reloads, every hit counts",
     rules=Rules(
+        submarine=replace(TYPE_VIIC, overdepth_rate=0.0005),
         torpedo=replace(G7E, reload_time=90.0),
-        sonar=replace(SONAR_ASDIC, range=2_400.0),
-        depth_charge=replace(DEPTH_CHARGE, damage=0.3),
-        escort_ai=replace(ESCORT_AI, lose_track_time=180.0),
+        sonar=replace(
+            SONAR_ASDIC,
+            range=2_400.0,
+            arc=45.0,
+            depth_blind_ratio=4.0,
+            aspect_floor=0.3,
+            layer_factor=0.4,
+            cloud_duration=240.0,
+        ),
+        depth_charge=replace(DEPTH_CHARGE, damage=0.3, pattern_cooldown=150.0),
+        escort_ai=replace(
+            ESCORT_AI,
+            lose_track_time=180.0,
+            datum_attack_age=120.0,
+            blind_attacks=1,
+            hunt_leash=6_000.0,
+            max_hunt_time=900.0,
+        ),
         torpedo_hit=replace(TORPEDO_HIT, glance_chance=1.0),
         scenario=ScenarioParams(escorts=1),
+        merchant_ai=replace(MERCHANT_AI, warning_delay=120.0),
     ),
     strategies=Strategies(escort_evade="none"),
 )
@@ -480,7 +570,7 @@ CADET = Difficulty(
 PATROL = Difficulty(
     name="patrol",
     title="Patrol",
-    description="two destroyers that dodge torpedoes, the Milestone 2 balance (the default)",
+    description="two destroyers that dodge torpedoes, the base sheet (the default)",
     rules=Rules(),
     strategies=Strategies(escort_evade="comb"),
 )
@@ -488,15 +578,35 @@ PATROL = Difficulty(
 VETERAN = Difficulty(
     name="veteran",
     title="Veteran",
-    description="three destroyers with longer sonar reach and memory that dodge torpedoes, "
-    "heavier charges, slow reloads, glancing hits rarely detonate",
+    description="three destroyers with longer sonar reach, a wide cone, radar and a long memory "
+    "that dodge torpedoes, heavier charges, slow reloads, glancing hits rarely detonate",
     rules=Rules(
+        submarine=replace(TYPE_VIIC, overdepth_rate=0.0015),
         torpedo=replace(G7E, reload_time=150.0),
-        sonar=replace(SONAR_ASDIC, range=3_600.0),
-        depth_charge=replace(DEPTH_CHARGE, damage=0.5, lethal_radius=15.0),
-        escort_ai=replace(ESCORT_AI, lose_track_time=480.0),
+        sonar=replace(
+            SONAR_ASDIC,
+            range=3_600.0,
+            arc=90.0,
+            depth_blind_ratio=2.5,
+            aspect_floor=0.5,
+            layer_factor=0.6,
+            sure_fraction=0.5,
+            cloud_duration=120.0,
+        ),
+        depth_charge=replace(DEPTH_CHARGE, damage=0.5, lethal_radius=15.0, pattern_cooldown=90.0),
+        escort_ai=replace(
+            ESCORT_AI,
+            lose_track_time=480.0,
+            datum_attack_age=240.0,
+            blind_attacks=3,
+            hunt_leash=15_000.0,
+            max_hunt_time=3_600.0,
+        ),
         torpedo_hit=replace(TORPEDO_HIT, glance_chance=0.25),
         scenario=ScenarioParams(escorts=3),
+        sea=replace(SEA, layer_chance=0.7),
+        radar=RADAR_SURFACE_SEARCH,
+        merchant_ai=replace(MERCHANT_AI, warning_delay=60.0),
     ),
     strategies=Strategies(escort_evade="comb"),
 )

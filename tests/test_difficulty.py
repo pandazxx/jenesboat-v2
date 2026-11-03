@@ -111,8 +111,15 @@ def test_patrol_is_the_base_sheet_and_the_other_levels_differ_in_the_documented_
     assert base.escort_ai.lose_track_time < veteran.escort_ai.lose_track_time
     assert cadet.depth_charge.damage < base.depth_charge.damage < veteran.depth_charge.damage
     assert cadet.torpedo.reload_time < base.torpedo.reload_time < veteran.torpedo.reload_time
-    # Only those blocks: the boat, the merchants and the detection table are the same.
-    for name in ("submarine", "detection", "merchant_ai"):
+    assert cadet.sonar.arc < base.sonar.arc < veteran.sonar.arc
+    assert cadet.sonar.aspect_floor < base.sonar.aspect_floor < veteran.sonar.aspect_floor
+    assert cadet.escort_ai.hunt_leash < base.escort_ai.hunt_leash < veteran.escort_ai.hunt_leash
+    assert cadet.radar.range == base.radar.range == 0 < veteran.radar.range
+    assert cadet.submarine.overdepth_rate < base.submarine.overdepth_rate
+    assert cadet.merchant_ai.warning_delay > base.merchant_ai.warning_delay
+    assert base.merchant_ai.warning_delay > veteran.merchant_ai.warning_delay
+    # The detection table and the evasion rules are the same at every level.
+    for name in ("detection", "evasion"):
         assert getattr(cadet, name) == getattr(base, name) == getattr(veteran, name)
 
 
@@ -153,7 +160,9 @@ def test_the_level_changes_what_the_escort_hears_and_how_long_it_remembers():
         d = world.ship("destroyer-1")
         sub = world.player
         sub.x, sub.y = project(d.x, d.y, d.heading, 1_200.0)
+        sub.heading = (d.heading + 90.0) % 360.0  # beam-on to the destroyer: a strong echo
         sub.depth = sub.target_depth = 30.0
+        world.layer_depth = None
         return world, run(world, 60)
 
     _, cadet_events = hunt(P.CADET)
@@ -161,12 +170,13 @@ def test_the_level_changes_what_the_escort_hears_and_how_long_it_remembers():
     assert "escort_alarm" in [e["event"] for e in cadet_events]
     assert "escort_alarm" in [e["event"] for e in veteran_events]
     hunter = next(d for d in world.ships if d.kind == "military" and d.escort.mode == HUNT)
-    assert hunter.escort.sonar_range > P.SONAR_ASDIC.range * P.SONAR_ASDIC.interference_floor
-    # Veteran escorts keep hunting long after cadet ones would have given up.
+    assert hunter.escort.sonar_range > 0.0
+    # Veteran escorts keep hunting long after cadet ones would have given up: the boat slips
+    # away, the hunter attacks the stale datum, leads blind, searches, and only then stands down.
     world.player.x, world.player.y = world.player.x - 15_000.0, world.player.y - 15_000.0
     run(world, P.CADET.rules.escort_ai.lose_track_time + 30)
     assert world.datum is not None
-    run(world, P.VETERAN.rules.escort_ai.lose_track_time)
+    run(world, 2_400)
     assert world.datum is None
 
 
