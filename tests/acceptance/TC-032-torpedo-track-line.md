@@ -17,8 +17,9 @@ A hunt at `patrol`: an attack position within 3 km of the convoy, undetected.
 
 - `destroyer-N has our torpedo's track: the escorts will sweep it`; an orange line appears
   along the torpedo's track back from where it was heard, 5 km long (the torpedo's run).
-- The hunter runs down that line toward you at 14 kn (`destroyer-N sweeps the torpedo track`),
-  the screen stands toward the line and the merchants turn away from it.
+- The hunter runs down that line toward you at 14 kn (`destroyer-N sweeps the torpedo track`)
+  and the screen stands toward the line; the merchants hold their course (nobody told them a
+  torpedo is running: #39), so a well-aimed shot hits.
 - A boat that has left the line is not found by the sweep unless its sonar picks you up; at the
   far end the hunter searches around it.
 

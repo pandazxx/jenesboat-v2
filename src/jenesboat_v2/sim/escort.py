@@ -273,8 +273,10 @@ def report(world: World, x: float, y: float, reason: str, by: str, ring: float =
         world.datum.origin = (x, y, t)
         world.datum.origin_from = (finder.x, finder.y)
         world.emit("escort_alarm", reason=reason, by=by)
-    # The convoy is told and runs for the screen.
-    world.alert_group(x, y, "escort", by, quiet=True, radius=MERCHANT_WARNING_RANGE)
+    # The convoy is told by its escorts, and turns away once the signal has gone round (#39).
+    # A merchant's own sighting has already alerted it.
+    if world.ship(by).kind == "military":
+        world.warn_convoy(x, y, by)
 
 
 def report_line(world: World, x: float, y: float, heading: float, length: float, by: str) -> None:
@@ -294,7 +296,7 @@ def report_line(world: World, x: float, y: float, heading: float, length: float,
     world.emit(
         "torpedo_line", by=by, x=round(x), y=round(y), heading=round(heading), length=round(length)
     )
-    world.alert_group(x, y, "escort", by, quiet=True, radius=MERCHANT_WARNING_RANGE)
+    # The merchants are not told: nobody on a freighter knows a torpedo is running (#39).
 
 
 def _refresh_datum(

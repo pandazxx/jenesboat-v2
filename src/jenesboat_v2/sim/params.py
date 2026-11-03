@@ -119,6 +119,7 @@ class MerchantAIParams:
     spread_angle: float  # deg between neighbours so a group fans out
     escape_range: float  # m from the boat at which an alerted merchant counts as escaped
     panic_range: float  # m, a torpedo hit alerts merchants within this distance
+    warning_delay: float  # s between an escort's report of the boat and the merchants' turn away
 
 
 @dataclass(frozen=True)
@@ -444,6 +445,7 @@ MERCHANT_AI = MerchantAIParams(
     spread_angle=20.0,
     escape_range=20_000.0,
     panic_range=6_000.0,
+    warning_delay=90.0,
 )
 
 ESCORT_AI = EscortAIParams(
@@ -560,6 +562,7 @@ CADET = Difficulty(
         ),
         torpedo_hit=replace(TORPEDO_HIT, glance_chance=1.0),
         scenario=ScenarioParams(escorts=1),
+        merchant_ai=replace(MERCHANT_AI, warning_delay=120.0),
     ),
     strategies=Strategies(escort_evade="none"),
 )
@@ -603,6 +606,7 @@ VETERAN = Difficulty(
         scenario=ScenarioParams(escorts=3),
         sea=replace(SEA, layer_chance=0.7),
         radar=RADAR_SURFACE_SEARCH,
+        merchant_ai=replace(MERCHANT_AI, warning_delay=60.0),
     ),
     strategies=Strategies(escort_evade="comb"),
 )

@@ -233,6 +233,7 @@ def test_an_observed_torpedo_gives_the_escorts_its_track_and_the_hunter_sweeps_i
     assert datum is not None and datum.kind == LINE and datum.band == 0
     assert math.isclose(datum.heading, 90.0)  # back along the track: east
     assert datum.length == t.params.max_run
+    assert not any(m.alerted(world.time) for m in world.merchants)  # nobody told them (#39)
     run(world, 120)
     h = hunter(world)
     assert h.escort.intent in ("sweeping", INTENT_HUNTING, INTENT_ATTACKING, INTENT_SEARCHING)
@@ -421,3 +422,88 @@ def test_levels_dial_the_hunt(_=None):
     assert replace(P.PATROL.strategies).escort_search == "sweep"
     assert project(0.0, 0.0, 90.0, 1.0)[0] > 0  # keep the import honest
     assert KNOT > 0
+
+
+# --- the torpedo alarm (#39) -----------------------------------------------------------------
+
+
+def test_merchants_turn_away_only_after_the_signal_delay():
+    world = convoy()
+    delay = world.rules.merchant_ai.warning_delay
+    evs = run(world, 30)
+    assert "escort_alarm" in kinds(evs)
+    assert world.warning_due is not None
+    assert not any(m.alerted(world.time) for m in world.merchants)
+    evs = run(world, delay + 5)
+    told = next(e for e in evs if e["event"] == "convoy_warned")
+    assert sorted(told["ships"]) == sorted(m.ship_id for m in world.merchants)
+    assert all(m.alerted(world.time) for m in world.merchants)
+    assert world.warning_due is None
+    assert "turn away" in describe("convoy_warned", {"by": "d1", "ships": ["a", "b"]})
+
+
+def aimed_shot(seed: int, range_m: float) -> str:
+    """One G7e at the middle freighter from the beam with a perfect solution, the boat at
+    periscope depth with the scope down, unalerted convoy; 'hit', 'glance' or 'miss'."""
+    import random
+
+    from jenesboat_v2.sim.weapons import solution
+
+    rng = random.Random(seed)
+    west = 1_500.0
+    ships = [
+        new_ship(
+            f"merchant-{i}", FREIGHTER, C - west + 800.0 * (i - 1), C, course=90.0, spread=i - 1
+        )
+        for i in range(3)
+    ]
+    ai = P.PATROL.rules.escort_ai
+    for i in range(2):
+        side = 1.0 if i % 2 == 0 else -1.0
+        ships.append(
+            new_ship(
+                f"destroyer-{i + 1}",
+                DESTROYER,
+                C - west + ai.station_ahead,
+                C - side * ai.station_abeam,
+                course=90.0,
+            )
+        )
+    sub = new_submarine(x=C + rng.uniform(-300.0, 300.0), y=C - range_m, heading=0.0)
+    sub.depth = sub.target_depth = P.TYPE_VIIC.periscope_depth
+    sub.scope_wanted = False
+    world = World(width=2 * C, height=2 * C, player=sub, ships=ships)
+    world.rng = random.Random(seed)
+    world.layer_depth = 70.0
+    target = world.ships[1]
+    fired = False
+    for _ in range(6_000):
+        world.step(0.2)
+        if not fired:
+            sol = solution(
+                sub.x,
+                sub.y,
+                sub.heading,
+                sub.tubes.params,
+                target.x,
+                target.y,
+                target.heading,
+                target.speed,
+            )
+            if sol is not None and abs(sol.error) <= target.params.length / 4:
+                world.fire()
+                fired = True
+        for e in world.events:
+            if e["event"] in ("hit", "glance"):
+                return e["event"]
+            if e["event"] == "torpedo_lost":
+                return "miss"
+        world.events.clear()
+    return "no shot"
+
+
+def test_an_aimed_shot_at_an_unalerted_convoy_hits():
+    """#39: the merchants are not warned by a heard torpedo and only after the signal delay by
+    a fix, so a well-aimed shot from the beam gets through."""
+    results = [aimed_shot(seed, range_m) for seed in range(3) for range_m in (2_000.0, 2_800.0)]
+    assert results.count("hit") >= 4, results

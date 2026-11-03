@@ -68,6 +68,8 @@ def test_escort_balance_relations_hold_at_every_level(name):
     assert rules.submarine.overdepth_rate > 0
     assert rules.radar.range == 0 or rules.radar.range > det.surfaced_range * P.DESTROYER.lookout
     assert 0 < rules.sea.layer_min < rules.sea.layer_max < rules.submarine.max_depth
+    # The convoy's signal takes longer than a torpedo's run from close in (#39).
+    assert rules.merchant_ai.warning_delay >= 60.0
     assert ai.max_hunters >= 1 and ai.hunters_per_escort >= 1
     # The torpedo and the boat stay the same weapon and hull, whatever the reload time.
     assert rules.torpedo.speed == P.G7E.speed and rules.torpedo.reload_time > 0

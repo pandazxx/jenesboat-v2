@@ -103,6 +103,7 @@ finds a *surfaced* boat at once and exactly, and the group treats it as a sighti
 | spread | 20° between neighbours | a group fans out instead of running in a line |
 | escape range | 20 km | a merchant this far from the boat (or off the map) has got away, alerted or not: the hunt area |
 | panic range | 6 km | a torpedo hit alerts every merchant within this distance |
+| warning delay | 90 s (cadet 120, veteran 60) | an escort's report of the boat (a fix, a sighting, radar) reaches the merchants, and they turn away, this long later: the commodore's emergency turn takes time to signal and to answer. A torpedo an escort hears does *not* warn the merchants at all (#39) |
 
 ## Destroyer escort (`SonarParams`, `SeaParams`, `DepthChargeParams`, `EscortAIParams`)
 
@@ -185,7 +186,7 @@ torpedo still hits.
 | --- | --- |
 | evading | (any state, `escort_evade = comb`) a torpedo that will pass too close is heard: comb its track at full speed until it has gone by, then resume |
 | formation | hold the station relative to the merchants' centre and route, at the convoy's speed (intent `formation`, or `returning` while getting back to it) |
-| alarm | a sonar fix, a sighting, a radar fix or an observed torpedo sets the group's *datum*. The convoy is told (merchants within 8 km run) |
+| alarm | a sonar fix, a sighting, a radar fix or an observed torpedo sets the group's *datum*. A fix, sighting or radar report also warns the convoy (merchants within 8 km turn away `warning_delay` later, `convoy_warned` in the log); an observed torpedo warns the escorts only (#39) |
 | split | the escorts nearest the datum hunt (`hunters_per_escort` = 1 hunter per 3 escorts, 1 to 2); the rest screen. A lost hunter is replaced from the screens |
 | hunting | steer for the predicted position of the boat, 20 kn, slow to 14 kn inside 1.5 km, throw a pattern from up to 150 m away while the fix is under 60 s old (`attacking` during a run) |
 | datum attack | a fix older than 60 s but younger than `datum_attack_age` 180 s (cadet 120, veteran 240) is still attacked once, at the dead-reckoned position |
@@ -233,6 +234,7 @@ same at every level except for the torpedo reload time, so the difficulty is in 
 | `escort_ai.hunt_leash` | 6 km | 10 km | 15 km | how far from the convoy a hunter will follow |
 | `escort_ai.max_hunt_time` | 15 min | 30 min | 60 min | how long the escorts hunt at most |
 | `submarine.overdepth_rate` | 0.05 %/s | 0.1 %/s | 0.15 %/s | per 20 m below the safe depth |
+| `merchant_ai.warning_delay` | 120 s | 90 s | 60 s | how long the convoy takes to answer an escort's report of the boat |
 | `torpedo.reload_time` | 90 s | 120 s | 150 s | how soon a second salvo is ready |
 | `torpedo_hit.glance_chance` | 1.0 | 0.5 | 0.25 | whether a bow-on or stern-on shot (under 30° off the axis) detonates: every hit counts at cadet |
 | `escort_evade` strategy | `none` | `comb` | `comb` | cadet destroyers never notice a torpedo; the others comb its track (#22) |

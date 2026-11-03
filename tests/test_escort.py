@@ -236,7 +236,7 @@ def test_merchants_run_for_the_screen_when_the_escort_is_alarmed():
         sx, sy = m.shelter
         # The shelter spot is behind the screening ship as seen from the boat.
         assert distance(sx, sy, sub.x, sub.y) > distance(screen.x, screen.y, sub.x, sub.y)
-    run(world, 300)
+    run(world, 420)  # the convoy answers the signal 90 s after the first fix (#39)
     for m in world.merchants:
         assert distance(m.x, m.y, screen.x, screen.y) < 2_500.0
 

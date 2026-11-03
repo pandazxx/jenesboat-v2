@@ -116,8 +116,10 @@ def test_patrol_is_the_base_sheet_and_the_other_levels_differ_in_the_documented_
     assert cadet.escort_ai.hunt_leash < base.escort_ai.hunt_leash < veteran.escort_ai.hunt_leash
     assert cadet.radar.range == base.radar.range == 0 < veteran.radar.range
     assert cadet.submarine.overdepth_rate < base.submarine.overdepth_rate
-    # The merchants and the detection table are the same at every level.
-    for name in ("detection", "merchant_ai", "evasion"):
+    assert cadet.merchant_ai.warning_delay > base.merchant_ai.warning_delay
+    assert base.merchant_ai.warning_delay > veteran.merchant_ai.warning_delay
+    # The detection table and the evasion rules are the same at every level.
+    for name in ("detection", "evasion"):
         assert getattr(cadet, name) == getattr(base, name) == getattr(veteran, name)
 
 

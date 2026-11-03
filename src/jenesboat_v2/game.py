@@ -305,6 +305,8 @@ def describe(name: str, data: dict) -> str | None:
         return f"ESCORT: {data['by']} {how.get(data['reason'], data['reason'])}"
     if name == "torpedo_line":
         return f"{data['by']} has our torpedo's track: the escorts will sweep it"
+    if name == "convoy_warned":
+        return f"the convoy is told by {data['by']}: {', '.join(data['ships'])} turn away"
     if name == "echo_lost":
         return f"{data['ship']} lost the echo: {data['why']}"
     if name == "blind_lead":

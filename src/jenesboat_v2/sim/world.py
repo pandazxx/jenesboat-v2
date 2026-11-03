@@ -127,6 +127,7 @@ class World:
         None  # the convoy centre at the alarm (the leash's post)
     )
     observed_torpedoes: set[int] = field(default_factory=set)  # torpedoes the escorts have heard
+    warning_due: tuple[float, float, float, str] | None = None  # (t, x, y, by): the convoy's signal
     depth_charges: list[DepthCharge] = field(default_factory=list)
     next_charge_id: int = 0
     clouds: list[Cloud] = field(default_factory=list)  # disturbed water left by patterns
@@ -274,6 +275,7 @@ class World:
         self._sense()
         self._lookouts(dt)
         escort_ai.step(self, dt)
+        self._deliver_warning()
         for ship in self.ships:
             if ship.active:
                 if ship.kind == "merchant":
@@ -366,6 +368,38 @@ class World:
                     escort_ai.report(self, sub.x, sub.y, "sighted", ship.ship_id)
             else:
                 ship.spot_timer = max(0.0, ship.spot_timer - dt)
+
+    def warn_convoy(self, x: float, y: float, by: str) -> None:
+        """An escort reports the boat at (x, y): the commodore's emergency turn is signalled
+        and answered ``warning_delay`` later (#39).  A signal already on its way stands; a
+        convoy already running just has its alarm refreshed."""
+        reach = escort_ai.MERCHANT_WARNING_RANGE
+        near = [
+            s
+            for s in self.active_ships
+            if s.kind == "merchant" and distance(x, y, s.x, s.y) <= reach
+        ]
+        if near and all(s.alerted(self.time) for s in near):
+            self.alert_group(x, y, "escort", by, quiet=True, radius=reach)
+            return
+        if self.warning_due is None:
+            delay = self.rules.merchant_ai.warning_delay
+            self.warning_due = (self.time + delay, x, y, by)
+
+    def _deliver_warning(self) -> None:
+        if self.warning_due is None or self.time < self.warning_due[0]:
+            return
+        _, x, y, by = self.warning_due
+        self.warning_due = None
+        reach = escort_ai.MERCHANT_WARNING_RANGE
+        told = [
+            s.ship_id
+            for s in self.active_ships
+            if s.kind == "merchant" and distance(x, y, s.x, s.y) <= reach
+        ]
+        if told:
+            self.emit("convoy_warned", by=by, ships=told)
+        self.alert_group(x, y, "escort", by, quiet=True, radius=reach)
 
     def alert_group(
         self,
